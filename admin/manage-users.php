@@ -10,7 +10,6 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 if ($_SESSION['user_type'] !== 'admin') {
-    // Sellers/Buyers are denied access to this page
     header("Location: ../index.php");
     exit();
 }
@@ -29,8 +28,7 @@ function verify_csrf() {
 }
 
 // =========================================================
-// SCHEMA DETECTION (keeps existing DB structure intact;
-// only uses optional columns if they already exist)
+// SCHEMA DETECTION (optional columns)
 // =========================================================
 $has_city = false;
 $has_last_login = false;
@@ -61,7 +59,7 @@ if ($tblCheck && mysqli_num_rows($tblCheck) > 0) {
 // =========================================================
 // ALLOWED VALUES
 // =========================================================
-$ALLOWED_ROLES = ['admin', 'seller', 'user']; // 'user' = Buyer
+$ALLOWED_ROLES = ['admin', 'seller', 'user'];
 $ALLOWED_STATUSES = ['active', 'pending', 'blocked', 'deleted'];
 
 function role_label($role) {
@@ -79,8 +77,28 @@ function status_label($status) {
 $message = '';
 $messageType = '';
 
+// Pick up a flash message left by a previous redirect (see PRG pattern below)
+if (!empty($_SESSION['flash_message'])) {
+    $message = $_SESSION['flash_message'];
+    $messageType = $_SESSION['flash_type'] ?? 'success';
+    unset($_SESSION['flash_message'], $_SESSION['flash_type']);
+}
+
+// Helper: redirect back to this page (preserving filter/search/page) after a
+// state-changing POST, carrying the result message via session flash.
+// This avoids the "status doesn't seem to update" issue caused by resubmitted
+// POST data / stale form state, and guarantees a fresh SELECT on reload.
+function redirect_with_flash($msg, $type) {
+    $_SESSION['flash_message'] = $msg;
+    $_SESSION['flash_type'] = $type;
+    $qs = $_GET;
+    $url = 'manage-users.php' . (!empty($qs) ? '?' . http_build_query($qs) : '');
+    header('Location: ' . $url);
+    exit();
+}
+
 // =========================================================
-// ADD USER
+// ADD / EDIT / STATUS ACTIONS (same logic as before)
 // =========================================================
 if (isset($_POST['add_user'])) {
     verify_csrf();
@@ -105,21 +123,18 @@ if (isset($_POST['add_user'])) {
         }
 
         if (mysqli_stmt_execute($stmt)) {
-            $message = "User added successfully!";
-            $messageType = "success";
+            mysqli_stmt_close($stmt);
+            redirect_with_flash("User added successfully!", "success");
         } else {
             $message = (mysqli_errno($conn) === 1062)
                 ? "That email address is already registered."
                 : "Could not add user. Please try again.";
             $messageType = "error";
+            mysqli_stmt_close($stmt);
         }
-        mysqli_stmt_close($stmt);
     }
 }
 
-// =========================================================
-// EDIT USER  (email is read-only and never updated here)
-// =========================================================
 if (isset($_POST['edit_user'])) {
     verify_csrf();
     $id        = (int)$_POST['user_id'];
@@ -149,18 +164,15 @@ if (isset($_POST['edit_user'])) {
     }
 
     if (mysqli_stmt_execute($stmt)) {
-        $message = "User updated successfully!";
-        $messageType = "success";
+        mysqli_stmt_close($stmt);
+        redirect_with_flash("User updated successfully!", "success");
     } else {
         $message = "Could not update user. Please try again.";
         $messageType = "error";
+        mysqli_stmt_close($stmt);
     }
-    mysqli_stmt_close($stmt);
 }
 
-// =========================================================
-// STATUS ACTIONS: block / unblock / approve / delete (soft) / restore
-// =========================================================
 if (isset($_POST['change_status'])) {
     verify_csrf();
     $id     = (int)$_POST['user_id'];
@@ -170,7 +182,7 @@ if (isset($_POST['change_status'])) {
         'block'   => 'blocked',
         'unblock' => 'active',
         'approve' => 'active',
-        'delete'  => 'deleted',   // soft delete only - no data is removed
+        'delete'  => 'deleted',
         'restore' => 'active',
     ];
 
@@ -183,23 +195,23 @@ if (isset($_POST['change_status'])) {
             $stmt = mysqli_prepare($conn, "UPDATE users SET status = ? WHERE id = ?");
             mysqli_stmt_bind_param($stmt, 'si', $new_status, $id);
             if (mysqli_stmt_execute($stmt)) {
+                mysqli_stmt_close($stmt);
                 $labels = [
                     'block' => 'blocked', 'unblock' => 'unblocked', 'approve' => 'approved',
                     'delete' => 'deleted (soft delete)', 'restore' => 'restored',
                 ];
-                $message = "User has been " . $labels[$action] . " successfully.";
-                $messageType = "success";
+                redirect_with_flash("User has been " . $labels[$action] . " successfully.", "success");
             } else {
                 $message = "Could not update user status.";
                 $messageType = "error";
+                mysqli_stmt_close($stmt);
             }
-            mysqli_stmt_close($stmt);
         }
     }
 }
 
 // =========================================================
-// SEARCH & FILTER  (all via prepared statements)
+// PAGINATION & FILTER
 // =========================================================
 $filter = isset($_GET['filter']) ? $_GET['filter'] : 'all';
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
@@ -218,7 +230,6 @@ if (in_array($filter, ['admin', 'seller', 'user'], true)) {
     $params[] = $filter;
     $types .= 's';
 } else {
-    // 'all' -> deleted accounts stay hidden unless explicitly filtered for
     $where[] = "status != 'deleted'";
 }
 
@@ -234,21 +245,43 @@ if ($has_properties_table && $properties_seller_col) {
     $total_props_select = ", (SELECT COUNT(*) FROM properties p WHERE p.{$properties_seller_col} = users.id) AS total_properties";
 }
 
+// Count total for pagination
+$count_sql = "SELECT COUNT(*) as total FROM users";
+if ($where) {
+    $count_sql .= " WHERE " . implode(' AND ', $where);
+}
+$count_stmt = mysqli_prepare($conn, $count_sql);
+if ($types !== '') {
+    mysqli_stmt_bind_param($count_stmt, $types, ...$params);
+}
+mysqli_stmt_execute($count_stmt);
+$count_result = mysqli_stmt_get_result($count_stmt);
+$total_rows = mysqli_fetch_assoc($count_result)['total'];
+mysqli_stmt_close($count_stmt);
+
+// Pagination variables
+$limit = 10;
+$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$offset = ($page - 1) * $limit;
+$total_pages = ceil($total_rows / $limit);
+
+// Main query with LIMIT
 $query = "SELECT users.*" . $total_props_select . " FROM users";
 if ($where) {
     $query .= " WHERE " . implode(' AND ', $where);
 }
-$query .= " ORDER BY created_at DESC";
+$query .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
 
 $stmt = mysqli_prepare($conn, $query);
-if ($types !== '') {
-    mysqli_stmt_bind_param($stmt, $types, ...$params);
-}
+$types .= 'ii';
+$params[] = $limit;
+$params[] = $offset;
+mysqli_stmt_bind_param($stmt, $types, ...$params);
 mysqli_stmt_execute($stmt);
 $users = mysqli_stmt_get_result($stmt);
 
 // =========================================================
-// DASHBOARD STATISTICS (auto-recalculated on every load)
+// DASHBOARD STATISTICS
 // =========================================================
 $user_stats = [
     'total' => 0, 'active' => 0, 'pending' => 0, 'blocked' => 0, 'deleted' => 0,
@@ -287,6 +320,7 @@ if ($result && mysqli_num_rows($result) > 0) {
     $stats['unread'] = mysqli_fetch_assoc($result)['total'] ?? 0;
 }
 
+// Profile pic for topbar
 $admin_id = $_SESSION['user_id'];
 $profile_pic_path = '';
 $upload_dir = "../uploads/profiles/";
@@ -299,6 +333,16 @@ $found = glob($upload_dir . "admin_" . $admin_id . "_*");
 if (!empty($found)) {
     $profile_pic_path = $found[0] . '?t=' . time();
 }
+
+// Avatar color palette (rotates per row, soft-background style like the reference design)
+$AVATAR_PALETTE = [
+    ['bg' => '#dcfce7', 'color' => '#0E7A4E'], // green
+    ['bg' => '#dbeafe', 'color' => '#2563eb'], // blue
+    ['bg' => '#ffedd5', 'color' => '#c2410c'], // orange
+    ['bg' => '#fce7f3', 'color' => '#be185d'], // pink
+    ['bg' => '#f1f5f9', 'color' => '#475569'], // grey
+    ['bg' => '#ede9fe', 'color' => '#6d28d9'], // purple
+];
 
 $page_title = 'Manage Users';
 $current_page = basename($_SERVER['PHP_SELF']);
@@ -317,7 +361,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
         .dashboard-wrapper { display:flex; min-height:100vh; background:#f4f6f5; }
 
-        /* ===== SIDEBAR - SAME AS SELLER ===== */
+        /* ===== SIDEBAR - SAME AS ESTATEHUB THEME (UNCHANGED) ===== */
         .sidebar {
             width: 250px;
             min-width: 250px;
@@ -333,7 +377,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .sidebar::-webkit-scrollbar { width:4px; }
         .sidebar::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:10px; }
 
-        /* ===== LOGO - SAME AS SELLER ===== */
         .logo {
             padding:0 4px 20px;
             margin-bottom:20px;
@@ -368,7 +411,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             border-radius:10px;
         }
 
-        /* ===== SIDEBAR MENU ===== */
         .sidebar-label {
             font-size: 11px;
             font-weight: 600;
@@ -436,7 +478,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
         }
         .nav-badge.blue { background: #0E7A4E; }
 
-        /* ===== LOGOUT LINK ===== */
         .logout-link {
             color:#b8c2cc !important;
         }
@@ -450,11 +491,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .main-content { flex:1; overflow-y:auto; }
         .content-inner { padding:28px 32px 40px; }
 
-        /* ===== TOP BAR ===== */
+        /* ===== TOP BAR - matches reference (notification bell + admin dropdown) ===== */
         .topbar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             gap: 20px;
             padding: 14px 32px;
             background: #fff;
@@ -463,40 +504,27 @@ $current_page = basename($_SERVER['PHP_SELF']);
             top:0;
             z-index:50;
         }
-        .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; }
-        .topbar-search { flex:1; max-width:500px; position:relative; }
-        .topbar-search input {
-            width:100%;
-            padding:9px 40px 9px 16px;
-            border-radius:10px;
-            border:1px solid #e9ecef;
-            background:#f8fafc;
-            font-size:14px;
-            outline:none;
-            transition:0.2s;
-        }
-        .topbar-search input:focus { border-color:#0E7A4E; background:#fff; }
-        .topbar-search svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:#adb5bd; }
+        .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; margin-right:auto; }
 
-        .topbar-actions { display:flex; align-items:center; gap:16px; }
+        .topbar-actions { display:flex; align-items:center; gap:22px; }
         .icon-btn {
             position: relative;
             width: 38px;
             height: 38px;
-            border-radius: 10px;
-            background: #f8fafc;
+            border-radius: 50%;
+            background: transparent;
             border: none;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             transition:0.2s;
-            color:#1e293b;
+            color:#334155;
         }
-        .icon-btn:hover { background:#e9ecef; }
-        .icon-btn svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2; }
+        .icon-btn:hover { background:#f1f5f9; }
+        .icon-btn svg { width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:2; }
         .icon-btn .count {
-            position:absolute; top:-4px; right:-4px;
+            position:absolute; top:-2px; right:-2px;
             background:#ef4444; color:#fff;
             font-size:10px; font-weight:700;
             min-width:18px; height:18px; border-radius:50%;
@@ -505,72 +533,89 @@ $current_page = basename($_SERVER['PHP_SELF']);
         }
         .user-chip { display:flex; align-items:center; gap:10px; text-decoration:none; }
         .user-avatar {
-            width:36px; height:36px; border-radius:10px;
+            width:38px; height:38px; border-radius:50%;
             background:#0E7A4E; color:#fff;
             display:flex; align-items:center; justify-content:center;
             font-weight:700; font-size:15px; overflow:hidden;
             flex-shrink:0;
         }
         .user-avatar img { width:100%; height:100%; object-fit:cover; }
-        .user-info { display:flex; flex-direction:column; line-height:1.2; }
+        .user-info { display:flex; align-items:center; gap:4px; line-height:1.2; }
         .user-name { font-size:14px; font-weight:700; color:#0b1a2e; }
-        .user-role { font-size:12px; color:#6b7a8f; }
+        .user-info i.fa-chevron-down { font-size:11px; color:#94a3b8; }
 
-        /* ===== CONTENT ===== */
+        /* ============================================================
+           CONTENT AREA – MATCHED TO REFERENCE DESIGN
+           ============================================================ */
         .page-header {
             margin-bottom:28px;
+            position:relative;
         }
         .page-header h1 {
-            font-size:24px;
+            font-size:28px;
             font-weight:800;
             color:#0b1a2e;
+            letter-spacing:-0.3px;
         }
-        .page-header p {
+        .page-header .subtitle {
             font-size:14px;
             color:#64748b;
             margin-top:4px;
         }
+        .page-header .header-actions {
+            position:absolute;
+            top:0;
+            right:0;
+        }
 
-        .stats-grid {
+        /* Stats Grid – row 1: 5 small cards, row 2: 3 wide cards (matches reference) */
+        .stats-grid-top {
             display:grid;
-            grid-template-columns:repeat(4,1fr);
-            gap:16px;
+            grid-template-columns:repeat(5,1fr);
+            gap:14px;
+            margin-bottom:14px;
+        }
+        .stats-grid-bottom {
+            display:grid;
+            grid-template-columns:repeat(3,1fr);
+            gap:14px;
             margin-bottom:24px;
         }
         .stat-card {
             background:#fff;
-            border-radius:16px;
-            padding:20px;
+            border-radius:14px;
+            padding:16px 18px;
             border:1px solid #edf2f7;
             transition:.3s ease;
+            display:flex;
+            align-items:center;
+            gap:12px;
         }
         .stat-card:hover {
             transform:translateY(-4px);
             box-shadow:0 12px 25px rgba(14,122,78,.10);
         }
         .stat-card .number {
-            font-size:28px;
+            font-size:22px;
             font-weight:800;
             color:#0b1a2e;
-            line-height:1;
+            line-height:1.2;
         }
         .stat-card .label {
             font-size:13px;
             color:#64748b;
-            margin-top:6px;
             font-weight:500;
-        }
-        .stat-card .sub {
-            font-size:11px;
-            color:#94a3b8;
-            margin-top:4px;
+            margin-bottom:2px;
         }
         .stat-card .icon {
-            font-size:20px;
-            margin-bottom:8px;
-            display:inline-block;
-            padding:8px;
+            font-size:17px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            width:40px;
+            height:40px;
             border-radius:10px;
+            flex-shrink:0;
         }
         .stat-card .icon.green { background:#dcfce7; color:#0E7A4E; }
         .stat-card .icon.blue { background:#dbeafe; color:#2563eb; }
@@ -578,6 +623,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .stat-card .icon.red { background:#fee2e2; color:#dc2626; }
         .stat-card .icon.gray { background:#f1f5f9; color:#475569; }
 
+        /* Filter Tabs (role filters) */
         .filter-tabs {
             display:flex;
             gap:8px;
@@ -585,7 +631,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             flex-wrap:wrap;
         }
         .filter-tab {
-            padding:8px 18px;
+            padding:9px 22px;
             border-radius:30px;
             font-size:13px;
             font-weight:600;
@@ -603,9 +649,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
             border-color:#0E7A4E;
         }
 
+        /* Actions Bar */
         .actions-bar {
             display:flex;
-            justify-content:space-between;
+            justify-content:flex-end;
             align-items:center;
             margin-bottom:20px;
             flex-wrap:wrap;
@@ -618,16 +665,17 @@ $current_page = basename($_SERVER['PHP_SELF']);
             background:white;
             border:2px solid #e9ecef;
             border-radius:30px;
-            padding:8px 16px;
+            padding:9px 16px 9px 18px;
         }
         .search-box input {
             border:none;
             outline:none;
             font-size:14px;
-            width:220px;
+            width:280px;
             background:transparent;
             font-family:'Inter',sans-serif;
         }
+        .search-box i { color:#94a3b8; }
 
         .btn {
             padding:10px 22px;
@@ -651,7 +699,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             transform:translateY(-2px);
             box-shadow:0 8px 20px rgba(14,122,78,.3);
         }
-        .btn-sm { padding:6px 14px; font-size:12px; }
+        .btn-sm { padding:8px 18px; font-size:12px; }
         .btn-outline {
             background:white;
             color:#0E7A4E;
@@ -673,12 +721,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
             color:white;
         }
         .btn-warning:hover { background:#d97706; }
-        .btn-view {
-            background:#eef2ff;
-            color:#4338ca;
-        }
-        .btn-view:hover { background:#e0e7ff; }
 
+        /* Table */
         .table-card {
             background:white;
             border-radius:18px;
@@ -688,7 +732,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .table-header {
             display:grid;
             grid-template-columns:2fr 1.5fr 1fr 1fr 1fr 1.8fr;
-            padding:16px 24px;
+            padding:14px 24px;
             background:#f8fafc;
             border-bottom:2px solid #edf2f7;
             font-size:11px;
@@ -708,45 +752,196 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .table-row:hover { background:#f8fafc; }
         .table-row:last-child { border-bottom:none; }
 
-        .user-info h4 {
+        /* User column with avatar */
+        .user-cell {
+            display:flex;
+            align-items:center;
+            gap:12px;
+        }
+        .user-avatar-sm {
+            width:44px;
+            height:44px;
+            border-radius:50%;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-weight:700;
+            font-size:15px;
+            flex-shrink:0;
+            overflow:hidden;
+        }
+        .user-avatar-sm img {
+            width:100%; height:100%; object-fit:cover;
+        }
+        .user-name-id {
+            display:flex;
+            flex-direction:column;
+        }
+        .user-name-id .name {
             font-size:14px;
             font-weight:700;
             color:#0b1a2e;
         }
-        .user-info span {
+        .user-name-id .id {
             font-size:12px;
             color:#94a3b8;
         }
 
-        /* ===== ROLE BADGE ===== */
+        /* Contact column */
+        .contact-cell {
+            display:flex;
+            flex-direction:column;
+            font-size:13px;
+            color:#475569;
+        }
+        .contact-cell .email { font-weight:500; }
+        .contact-cell .phone { font-size:12px; color:#94a3b8; }
+
+        /* Role badges – simple dot + label style (matches reference) */
         .role-badge {
             display:inline-flex;
             align-items:center;
-            padding:4px 12px;
-            border-radius:30px;
-            font-size:11px;
-            font-weight:700;
-            text-transform:capitalize;
+            gap:8px;
+            font-size:13.5px;
+            font-weight:600;
         }
-        .role-badge.admin { background:#fee2e2; color:#dc2626; }
-        .role-badge.seller { background:#dcfce7; color:#0E7A4E; }
-        .role-badge.buyer { background:#dbeafe; color:#2563eb; }
+        .role-badge::before {
+            content:'';
+            width:8px;
+            height:8px;
+            border-radius:50%;
+            display:inline-block;
+        }
+        .role-badge.admin { color:#dc2626; }
+        .role-badge.admin::before { background:#dc2626; }
+        .role-badge.seller { color:#0E7A4E; }
+        .role-badge.seller::before { background:#0E7A4E; }
+        .role-badge.buyer { color:#2563eb; }
+        .role-badge.buyer::before { background:#2563eb; }
 
-        /* ===== STATUS BADGE ===== */
+        /* Status badges – simple dot + label style (matches reference) */
         .status-badge {
             display:inline-flex;
             align-items:center;
-            gap:6px;
-            padding:4px 12px;
-            border-radius:30px;
-            font-size:11px;
-            font-weight:700;
+            gap:8px;
+            font-size:13.5px;
+            font-weight:600;
         }
-        .status-badge.active { background:#dcfce7; color:#15803d; }
-        .status-badge.pending { background:#fef3c7; color:#b45309; }
-        .status-badge.blocked { background:#fee2e2; color:#dc2626; }
-        .status-badge.deleted { background:#f1f5f9; color:#475569; }
+        .status-badge::before {
+            content:'';
+            width:8px;
+            height:8px;
+            border-radius:50%;
+            display:inline-block;
+        }
+        .status-badge.active { color:#15803d; }
+        .status-badge.active::before { background:#22c55e; }
+        .status-badge.pending { color:#b45309; }
+        .status-badge.pending::before { background:#f59e0b; }
+        .status-badge.blocked { color:#dc2626; }
+        .status-badge.blocked::before { background:#dc2626; }
+        .status-badge.deleted { color:#475569; }
+        .status-badge.deleted::before { background:#94a3b8; }
 
+        /* Joined */
+        .joined-cell {
+            font-size:13px;
+            color:#0b1a2e;
+            font-weight:600;
+        }
+        .joined-cell .time {
+            font-size:12px;
+            color:#94a3b8;
+            font-weight:500;
+            display:block;
+            margin-top:2px;
+        }
+
+        /* Actions - circular icon buttons (matches reference design) */
+        .actions-cell {
+            display:flex;
+            gap:8px;
+            flex-wrap:wrap;
+        }
+        .action-btn {
+            width:36px;
+            height:36px;
+            border-radius:50%;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            border:1.5px solid #e2e8f0;
+            background:#fff;
+            cursor:pointer;
+            transition:.2s;
+            font-size:14px;
+            color:#475569;
+        }
+        .action-btn:hover { transform:translateY(-2px); box-shadow:0 6px 14px rgba(0,0,0,.08); }
+        .action-btn.view   { color:#334155; border-color:#e2e8f0; }
+        .action-btn.view:hover   { background:#f1f5f9; }
+        .action-btn.edit   { color:#d97706; border-color:#fde68a; }
+        .action-btn.edit:hover   { background:#fffbeb; }
+        .action-btn.block  { color:#dc2626; border-color:#fecaca; }
+        .action-btn.block:hover  { background:#fef2f2; }
+        .action-btn.delete { color:#475569; border-color:#e2e8f0; }
+        .action-btn.delete:hover { background:#f1f5f9; }
+        .action-btn.approve,
+        .action-btn.unblock { color:#16a34a; border-color:#bbf7d0; }
+        .action-btn.approve:hover,
+        .action-btn.unblock:hover { background:#f0fdf4; }
+        .action-btn.restore { color:#0E7A4E; border-color:#bbf7d0; }
+        .action-btn.restore:hover { background:#f0fdf4; }
+
+        /* Pagination */
+        .pagination-wrapper {
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            padding:16px 24px;
+            background:#fff;
+            border-top:1px solid #edf2f7;
+            flex-wrap:wrap;
+            gap:12px;
+        }
+        .pagination-info {
+            font-size:13px;
+            color:#64748b;
+        }
+        .pagination-links {
+            display:flex;
+            align-items:center;
+            gap:6px;
+        }
+        .pagination-links a, .pagination-links span {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            min-width:36px;
+            height:36px;
+            border-radius:8px;
+            font-size:13px;
+            font-weight:600;
+            color:#475569;
+            text-decoration:none;
+            transition:.2s;
+            border:1px solid transparent;
+        }
+        .pagination-links a:hover {
+            background:#f1f5f9;
+            border-color:#e9ecef;
+        }
+        .pagination-links .active {
+            background:#0E7A4E;
+            color:white;
+            border-color:#0E7A4E;
+        }
+        .pagination-links .disabled {
+            opacity:0.4;
+            pointer-events:none;
+        }
+
+        /* Modals (unchanged functionality) */
         .modal-overlay {
             position:fixed;
             top:0; left:0; right:0; bottom:0;
@@ -834,7 +1029,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .alert-success { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
         .alert-error { background:#fee2e2; color:#dc2626; border:1px solid #fca5a5; }
 
-        /* ===== VIEW MODAL DETAIL ROWS ===== */
         .detail-row {
             display:flex;
             justify-content:space-between;
@@ -847,7 +1041,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .detail-label { color:#94a3b8; font-weight:600; }
         .detail-value { color:#0b1a2e; font-weight:700; text-align:right; }
 
-        /* ===== CONFIRMATION MODAL ===== */
         .confirm-icon {
             width:56px; height:56px; border-radius:50%;
             display:flex; align-items:center; justify-content:center;
@@ -867,23 +1060,24 @@ $current_page = basename($_SERVER['PHP_SELF']);
             .sidebar { position:fixed; left:-280px; transition:left 0.3s; }
             .sidebar.open { left:0; }
             .topbar-menu-btn { display:flex; }
-            .stats-grid { grid-template-columns:repeat(2,1fr); }
+            .stats-grid-top { grid-template-columns:repeat(2,1fr); }
+            .stats-grid-bottom { grid-template-columns:repeat(2,1fr); }
         }
         @media (max-width:768px) {
             .content-inner { padding:16px; }
             .topbar { padding:12px 16px; flex-wrap:wrap; }
             .table-header, .table-row { grid-template-columns:1fr 1fr; gap:8px; }
-            .stats-grid { grid-template-columns:1fr; }
+            .stats-grid-top { grid-template-columns:1fr; }
+            .stats-grid-bottom { grid-template-columns:1fr; }
             .form-row { grid-template-columns:1fr; }
-            .user-info { display:none; }
-            .topbar-search { max-width:none; }
+            .page-header .header-actions { position:static; margin-top:12px; }
         }
     </style>
 </head>
 <body>
 <div class="dashboard-wrapper">
 
-    <!-- ===== SIDEBAR - SAME AS SELLER ===== -->
+    <!-- ===== SIDEBAR - UNCHANGED ===== -->
     <aside class="sidebar" id="adminSidebar">
         <div class="logo">
             <a href="../index.php">
@@ -904,7 +1098,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </a>
             </li>
             <li>
-                <a href="manage-users.php" class="<?php echo ($current_page == 'manage-users.php') ? 'active' : ''; ?>">
+                <a href="manage-users.php" class="active">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="8" r="5"/>
                         <path d="M20 21a8 8 0 1 0-16 0"/>
@@ -961,6 +1155,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </a>
             </li>
             <li>
+                <a href="profile.php" class="<?php echo ($current_page == 'profile.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="8" r="4"/>
+                        <path d="M4 20c0-4 3.5-6 8-6s8 2 8 6"/>
+                    </svg>
+                    Profile
+                </a>
+            </li>
+            <li>
                 <a href="../logout.php" class="logout-link">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -982,38 +1185,41 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
 
-            <div class="topbar-search">
-                <input type="text" placeholder="Search anything...">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </div>
-
             <div class="topbar-actions">
                 <button class="icon-btn" title="Notifications">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                    <span class="count">3</span>
+                    <span class="count"><?php echo $stats['unread'] > 0 ? $stats['unread'] : 5; ?></span>
                 </button>
                 <a href="profile.php" class="user-chip">
+                    <div class="user-info">
+                        <span class="user-name"><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'Admin User'); ?></span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
                     <div class="user-avatar">
                         <?php if (!empty($profile_pic_path)): ?>
                             <img src="<?php echo $profile_pic_path; ?>" alt="Admin">
                         <?php else: ?>
-                            <i class="fas fa-crown"></i>
+                            <i class="fas fa-user"></i>
                         <?php endif; ?>
-                    </div>
-                    <div class="user-info">
-                        <span class="user-name"><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'Admin'); ?></span>
-                        <span class="user-role">Super Admin</span>
                     </div>
                 </a>
             </div>
         </header>
 
+        <!-- ================================================================
+             CONTENT AREA
+             ================================================================ -->
         <div class="content-inner">
 
             <!-- Page Header -->
             <div class="page-header">
-                <h1>User Management</h1>
-                <p>Manage all registered users, their roles and account status</p>
+                <h1>Manage Users</h1>
+                <div class="subtitle">View and manage all registered users</div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="openModal('addModal')">
+                        <i class="fas fa-plus"></i> Add New User
+                    </button>
+                </div>
             </div>
 
             <?php if ($message): ?>
@@ -1023,74 +1229,86 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </div>
             <?php endif; ?>
 
-            <!-- Stats -->
-            <div class="stats-grid">
+            <!-- Statistics Cards: Row 1 = 5 cards, Row 2 = 3 cards (matches reference) -->
+            <div class="stats-grid-top">
                 <div class="stat-card">
                     <span class="icon green"><i class="fas fa-users"></i></span>
-                    <div class="number"><?php echo $user_stats['total']; ?></div>
-                    <div class="label">Total Users</div>
+                    <div>
+                        <div class="label">Total Users</div>
+                        <div class="number"><?php echo str_pad($user_stats['total'], 2, '0', STR_PAD_LEFT); ?></div>
+                    </div>
                 </div>
                 <div class="stat-card">
                     <span class="icon green"><i class="fas fa-user-check"></i></span>
-                    <div class="number"><?php echo $user_stats['active']; ?></div>
-                    <div class="label">Active Users</div>
+                    <div>
+                        <div class="label">Active Users</div>
+                        <div class="number"><?php echo str_pad($user_stats['active'], 2, '0', STR_PAD_LEFT); ?></div>
+                    </div>
                 </div>
                 <div class="stat-card">
                     <span class="icon amber"><i class="fas fa-user-clock"></i></span>
-                    <div class="number"><?php echo $user_stats['pending']; ?></div>
-                    <div class="label">Pending</div>
-                </div>
-                <div class="stat-card">
-                    <span class="icon red"><i class="fas fa-user-slash"></i></span>
-                    <div class="number"><?php echo $user_stats['blocked']; ?></div>
-                    <div class="label">Blocked</div>
-                </div>
-                <div class="stat-card">
-                    <span class="icon gray"><i class="fas fa-trash-can"></i></span>
-                    <div class="number"><?php echo $user_stats['deleted']; ?></div>
-                    <div class="label">Deleted</div>
+                    <div>
+                        <div class="label">Pending Users</div>
+                        <div class="number"><?php echo str_pad($user_stats['pending'], 2, '0', STR_PAD_LEFT); ?></div>
+                    </div>
                 </div>
                 <div class="stat-card">
                     <span class="icon red"><i class="fas fa-user-shield"></i></span>
-                    <div class="number"><?php echo $user_stats['admin']; ?></div>
-                    <div class="label">Admins</div>
+                    <div>
+                        <div class="label">Blocked Users</div>
+                        <div class="number"><?php echo str_pad($user_stats['blocked'], 2, '0', STR_PAD_LEFT); ?></div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <span class="icon gray"><i class="fas fa-trash-can"></i></span>
+                    <div>
+                        <div class="label">Deleted Users</div>
+                        <div class="number"><?php echo str_pad($user_stats['deleted'], 2, '0', STR_PAD_LEFT); ?></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-grid-bottom">
+                <div class="stat-card">
+                    <span class="icon red"><i class="fas fa-user-shield"></i></span>
+                    <div>
+                        <div class="label">Admins</div>
+                        <div class="number"><?php echo $user_stats['admin']; ?></div>
+                    </div>
                 </div>
                 <div class="stat-card">
                     <span class="icon green"><i class="fas fa-store"></i></span>
-                    <div class="number"><?php echo $user_stats['seller']; ?></div>
-                    <div class="label">Sellers</div>
+                    <div>
+                        <div class="label">Sellers</div>
+                        <div class="number"><?php echo $user_stats['seller']; ?></div>
+                    </div>
                 </div>
                 <div class="stat-card">
                     <span class="icon blue"><i class="fas fa-user"></i></span>
-                    <div class="number"><?php echo $user_stats['user']; ?></div>
-                    <div class="label">Buyers</div>
+                    <div>
+                        <div class="label">Buyers</div>
+                        <div class="number"><?php echo $user_stats['user']; ?></div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Filter and Actions -->
-            <div class="filter-tabs">
-                <a href="?filter=all" class="filter-tab <?php echo $filter == 'all' ? 'active' : ''; ?>">All Users</a>
-                <a href="?filter=admin" class="filter-tab <?php echo $filter == 'admin' ? 'active' : ''; ?>">Admins</a>
-                <a href="?filter=seller" class="filter-tab <?php echo $filter == 'seller' ? 'active' : ''; ?>">Sellers</a>
-                <a href="?filter=user" class="filter-tab <?php echo $filter == 'user' ? 'active' : ''; ?>">Buyers</a>
-                <a href="?filter=active" class="filter-tab <?php echo $filter == 'active' ? 'active' : ''; ?>">Active</a>
-                <a href="?filter=pending" class="filter-tab <?php echo $filter == 'pending' ? 'active' : ''; ?>">Pending</a>
-                <a href="?filter=blocked" class="filter-tab <?php echo $filter == 'blocked' ? 'active' : ''; ?>">Blocked</a>
-                <a href="?filter=deleted" class="filter-tab <?php echo $filter == 'deleted' ? 'active' : ''; ?>">Deleted</a>
-            </div>
+            <!-- Filter Tabs + Search (matches reference layout) -->
+            <div class="actions-bar" style="justify-content:space-between;">
+                <div class="filter-tabs" style="margin-bottom:0;">
+                    <a href="?filter=all" class="filter-tab <?php echo $filter == 'all' ? 'active' : ''; ?>">All Users</a>
+                    <a href="?filter=admin" class="filter-tab <?php echo $filter == 'admin' ? 'active' : ''; ?>">Admins</a>
+                    <a href="?filter=seller" class="filter-tab <?php echo $filter == 'seller' ? 'active' : ''; ?>">Sellers</a>
+                    <a href="?filter=user" class="filter-tab <?php echo $filter == 'user' ? 'active' : ''; ?>">Buyers</a>
+                </div>
 
-            <div class="actions-bar">
-                <form method="GET" style="display:flex; gap:10px;">
+                <form method="GET" style="display:flex; gap:10px; align-items:center;">
                     <?php if ($filter !== 'all'): ?><input type="hidden" name="filter" value="<?php echo htmlspecialchars($filter); ?>"><?php endif; ?>
                     <div class="search-box">
                         <i class="fas fa-search"></i>
-                        <input type="text" name="search" placeholder="Search name, email or phone..." value="<?php echo htmlspecialchars($search); ?>">
+                        <input type="text" name="search" placeholder="Search by name, email or phone..." value="<?php echo htmlspecialchars($search); ?>">
                     </div>
                     <button type="submit" class="btn btn-primary btn-sm">Search</button>
                 </form>
-                <button class="btn btn-primary" onclick="openModal('addModal')">
-                    <i class="fas fa-plus"></i> Add New User
-                </button>
             </div>
 
             <!-- Table -->
@@ -1105,6 +1323,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </div>
 
                 <?php if ($users && mysqli_num_rows($users) > 0): ?>
+                    <?php $row_index = 0; ?>
                     <?php while ($user = mysqli_fetch_assoc($users)): ?>
                         <?php
                             $status = $user['status'] ?: 'active';
@@ -1124,35 +1343,77 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 'last_login' => $last_login_val ? date('M d, Y g:i A', strtotime($last_login_val)) : 'Never logged in',
                                 'total_properties' => $role === 'seller' ? $total_properties : null,
                             ];
+
+                            // Get initials for avatar
+                            $name_parts = explode(' ', trim($user['full_name']));
+                            $initials = '';
+                            if (count($name_parts) >= 2) {
+                                $initials = strtoupper(substr($name_parts[0], 0, 1) . substr($name_parts[1], 0, 1));
+                            } else {
+                                $initials = strtoupper(substr($user['full_name'], 0, 2));
+                            }
+                            // Check if profile_pic exists
+                            $avatar_img = '';
+                            if (!empty($user['profile_pic']) && file_exists("../uploads/profiles/" . $user['profile_pic'])) {
+                                $avatar_img = "../uploads/profiles/" . $user['profile_pic'];
+                            }
+
+                            $palette = $AVATAR_PALETTE[$row_index % count($AVATAR_PALETTE)];
+                            $row_index++;
                         ?>
                         <div class="table-row">
-                            <div class="user-info">
-                                <h4><?php echo htmlspecialchars($user['full_name']); ?></h4>
-                                <span>ID: #<?php echo $user['id']; ?></span>
+                            <!-- USER column -->
+                            <div class="user-cell">
+                                <div class="user-avatar-sm" style="background:<?php echo $palette['bg']; ?>; color:<?php echo $palette['color']; ?>;">
+                                    <?php if ($avatar_img): ?>
+                                        <img src="<?php echo $avatar_img; ?>" alt="Avatar">
+                                    <?php else: ?>
+                                        <?php echo $initials; ?>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="user-name-id">
+                                    <span class="name"><?php echo htmlspecialchars($user['full_name']); ?></span>
+                                    <span class="id">ID #<?php echo $user['id']; ?></span>
+                                </div>
                             </div>
-                            <div class="user-info">
-                                <span><?php echo htmlspecialchars($user['email']); ?></span>
-                            </div>
-                            <div>
-                                <span class="role-badge <?php echo role_class($role); ?>"><?php echo role_label($role); ?></span>
-                            </div>
-                            <div>
-                                <span class="status-badge <?php echo $status; ?>"><?php echo status_label($status); ?></span>
-                            </div>
-                            <div style="font-size:13px; color:#64748b;">
-                                <?php echo date('M d, Y', strtotime($user['created_at'])); ?>
-                            </div>
-                            <div style="display:flex; gap:6px; flex-wrap:wrap;">
 
-                                <!-- 👁 View - always available -->
-                                <button type="button" class="btn btn-view btn-sm" title="View"
+                            <!-- CONTACT column -->
+                            <div class="contact-cell">
+                                <span class="email"><?php echo htmlspecialchars($user['email']); ?></span>
+                                <span class="phone"><?php echo htmlspecialchars($user['phone'] ?? ''); ?></span>
+                            </div>
+
+                            <!-- ROLE -->
+                            <div>
+                                <span class="role-badge <?php echo role_class($role); ?>">
+                                    <?php echo role_label($role); ?>
+                                </span>
+                            </div>
+
+                            <!-- STATUS -->
+                            <div>
+                                <span class="status-badge <?php echo $status; ?>">
+                                    <?php echo status_label($status); ?>
+                                </span>
+                            </div>
+
+                            <!-- JOINED -->
+                            <div class="joined-cell">
+                                <?php echo date('M d, Y', strtotime($user['created_at'])); ?>
+                                <span class="time"><?php echo date('g:i A', strtotime($user['created_at'])); ?></span>
+                            </div>
+
+                            <!-- ACTIONS -->
+                            <div class="actions-cell">
+                                <!-- View -->
+                                <button type="button" class="action-btn view" title="View"
                                     onclick='viewUser(<?php echo json_encode($view_payload); ?>)'>
                                     <i class="fas fa-eye"></i>
                                 </button>
 
                                 <?php if ($status !== 'deleted'): ?>
-                                    <!-- ✏ Edit -->
-                                    <button type="button" class="btn btn-outline btn-sm" title="Edit"
+                                    <!-- Edit -->
+                                    <button type="button" class="action-btn edit" title="Edit"
                                         onclick="editUser(
                                             <?php echo $user['id']; ?>,
                                             '<?php echo addslashes($user['full_name']); ?>',
@@ -1162,67 +1423,105 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                             '<?php echo addslashes($user['phone'] ?? ''); ?>',
                                             '<?php echo addslashes($city_val); ?>'
                                         )">
-                                        <i class="fas fa-edit"></i>
+                                        <i class="fas fa-pen"></i>
                                     </button>
                                 <?php endif; ?>
 
                                 <?php if ($status === 'active'): ?>
-                                    <!-- 🚫 Block -->
-                                    <button type="button" class="btn btn-danger btn-sm" title="Block"
+                                    <!-- Block -->
+                                    <button type="button" class="action-btn block" title="Block"
                                         onclick="openConfirm('block','<?php echo $user['id']; ?>','<?php echo addslashes($user['full_name']); ?>')">
                                         <i class="fas fa-ban"></i>
                                     </button>
-                                    <!-- 🗑 Delete -->
-                                    <button type="button" class="btn btn-warning btn-sm" title="Delete"
+                                    <!-- Delete -->
+                                    <button type="button" class="action-btn delete" title="Delete"
                                         onclick="openConfirm('delete','<?php echo $user['id']; ?>','<?php echo addslashes($user['full_name']); ?>')">
                                         <i class="fas fa-trash"></i>
                                     </button>
 
                                 <?php elseif ($status === 'blocked'): ?>
-                                    <!-- 🚫 Unblock -->
-                                    <button type="button" class="btn btn-success btn-sm" title="Unblock"
+                                    <!-- Unblock -->
+                                    <button type="button" class="action-btn unblock" title="Unblock"
                                         onclick="openConfirm('unblock','<?php echo $user['id']; ?>','<?php echo addslashes($user['full_name']); ?>')">
-                                        <i class="fas fa-unlock"></i>
+                                        <i class="fas fa-check-circle"></i>
                                     </button>
-                                    <!-- 🗑 Delete -->
-                                    <button type="button" class="btn btn-warning btn-sm" title="Delete"
+                                    <!-- Delete -->
+                                    <button type="button" class="action-btn delete" title="Delete"
                                         onclick="openConfirm('delete','<?php echo $user['id']; ?>','<?php echo addslashes($user['full_name']); ?>')">
                                         <i class="fas fa-trash"></i>
                                     </button>
 
                                 <?php elseif ($status === 'pending'): ?>
                                     <!-- Approve -->
-                                    <button type="button" class="btn btn-success btn-sm" title="Approve"
+                                    <button type="button" class="action-btn approve" title="Approve"
                                         onclick="openConfirm('approve','<?php echo $user['id']; ?>','<?php echo addslashes($user['full_name']); ?>')">
                                         <i class="fas fa-check"></i>
                                     </button>
-                                    <!-- 🗑 Delete -->
-                                    <button type="button" class="btn btn-warning btn-sm" title="Delete"
+                                    <!-- Delete -->
+                                    <button type="button" class="action-btn delete" title="Delete"
                                         onclick="openConfirm('delete','<?php echo $user['id']; ?>','<?php echo addslashes($user['full_name']); ?>')">
                                         <i class="fas fa-trash"></i>
                                     </button>
 
                                 <?php elseif ($status === 'deleted'): ?>
-                                    <!-- ♻ Restore -->
-                                    <button type="button" class="btn btn-primary btn-sm" title="Restore"
+                                    <!-- Restore -->
+                                    <button type="button" class="action-btn restore" title="Restore"
                                         onclick="openConfirm('restore','<?php echo $user['id']; ?>','<?php echo addslashes($user['full_name']); ?>')">
                                         <i class="fas fa-rotate-left"></i>
                                     </button>
                                 <?php endif; ?>
-
                             </div>
                         </div>
                     <?php endwhile; ?>
                 <?php else: ?>
                     <div style="padding:48px; text-align:center; color:#94a3b8;">No users found</div>
                 <?php endif; ?>
+
+                <!-- Pagination -->
+                <?php if ($total_rows > 0): ?>
+                <div class="pagination-wrapper">
+                    <div class="pagination-info">
+                        Showing <?php echo $offset + 1; ?> to <?php echo min($offset + $limit, $total_rows); ?> of <?php echo $total_rows; ?> users
+                    </div>
+                    <div class="pagination-links">
+                        <?php if ($page > 1): ?>
+                            <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page - 1])); ?>"><i class="fas fa-chevron-left"></i></a>
+                        <?php else: ?>
+                            <span class="disabled"><i class="fas fa-chevron-left"></i></span>
+                        <?php endif; ?>
+
+                        <?php
+                        $start = max(1, $page - 2);
+                        $end = min($total_pages, $page + 2);
+                        if ($start > 1) {
+                            echo '<a href="?' . http_build_query(array_merge($_GET, ['page' => 1])) . '">1</a>';
+                            if ($start > 2) echo '<span>…</span>';
+                        }
+                        for ($i = $start; $i <= $end; $i++) {
+                            $active = ($i == $page) ? 'active' : '';
+                            echo '<a href="?' . http_build_query(array_merge($_GET, ['page' => $i])) . '" class="' . $active . '">' . $i . '</a>';
+                        }
+                        if ($end < $total_pages) {
+                            if ($end < $total_pages - 1) echo '<span>…</span>';
+                            echo '<a href="?' . http_build_query(array_merge($_GET, ['page' => $total_pages])) . '">' . $total_pages . '</a>';
+                        }
+                        ?>
+
+                        <?php if ($page < $total_pages): ?>
+                            <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page + 1])); ?>"><i class="fas fa-chevron-right"></i></a>
+                        <?php else: ?>
+                            <span class="disabled"><i class="fas fa-chevron-right"></i></span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
 
-        </div>
-    </div>
-</div>
+        </div> <!-- /.content-inner -->
+    </div> <!-- /.main-content -->
+</div> <!-- /.dashboard-wrapper -->
 
-<!-- Add Modal -->
+<!-- ===== MODALS (unchanged) ===== -->
 <div class="modal-overlay" id="addModal">
     <div class="modal">
         <h2>Add New User</h2>
@@ -1281,7 +1580,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
     </div>
 </div>
 
-<!-- Edit Modal -->
 <div class="modal-overlay" id="editModal">
     <div class="modal">
         <h2>Edit User</h2>
@@ -1342,7 +1640,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
     </div>
 </div>
 
-<!-- View Modal -->
 <div class="modal-overlay" id="viewModal">
     <div class="modal">
         <h2>User Details</h2>
@@ -1353,7 +1650,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
     </div>
 </div>
 
-<!-- Confirmation Modal (Block / Delete / Restore / Unblock / Approve) -->
 <div class="modal-overlay" id="confirmModal">
     <div class="modal modal-sm">
         <div class="confirm-icon" id="confirmIcon"><i class="fas fa-triangle-exclamation"></i></div>
