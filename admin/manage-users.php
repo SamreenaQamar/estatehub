@@ -566,6 +566,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             color:#94a3b8;
         }
 
+        /* ===== STATUS BADGE - BLOCKED SHOWS AS INACTIVE ===== */
         .status-badge {
             display:inline-flex;
             align-items:center;
@@ -838,7 +839,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <div class="stat-card">
                     <span class="icon red"><i class="fas fa-user-slash"></i></span>
                     <div class="number"><?php echo $user_stats['blocked']; ?></div>
-                    <div class="label">Blocked</div>
+                    <div class="label">Inactive</div>
                 </div>
             </div>
 
@@ -876,6 +877,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
                 <?php if ($users && mysqli_num_rows($users) > 0): ?>
                     <?php while ($user = mysqli_fetch_assoc($users)): ?>
+                        <?php 
+                            // ===== STATUS DISPLAY MAPPING =====
+                            // Blocked users show as "Inactive"
+                            // Empty/null status also shows as "Inactive"
+                            if (empty($user['status']) || $user['status'] == 'blocked') {
+                                $status_display = 'Inactive';
+                            } else {
+                                $status_display = ucfirst($user['status']);
+                            }
+                        ?>
                         <div class="table-row">
                             <div class="user-info">
                                 <h4><?php echo htmlspecialchars($user['full_name']); ?></h4>
@@ -888,7 +899,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 <span style="font-weight:600; text-transform:capitalize;"><?php echo htmlspecialchars($user['user_type']); ?></span>
                             </div>
                             <div>
-                                <span class="status-badge <?php echo $user['status']; ?>"><?php echo ucfirst($user['status']); ?></span>
+                                <!-- Status Badge with proper display -->
+                                <?php $badge_class = empty($user['status']) ? 'blocked' : $user['status']; ?>
+                                <span class="status-badge <?php echo $badge_class; ?>"><?php echo $status_display; ?></span>
                             </div>
                             <div style="font-size:13px; color:#64748b;">
                                 <?php echo date('M d, Y', strtotime($user['created_at'])); ?>
@@ -904,8 +917,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 )">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <a href="?toggle=<?php echo $user['id']; ?>" class="btn btn-sm <?php echo $user['status'] == 'active' ? 'btn-danger' : 'btn-success'; ?>">
-                                    <?php echo $user['status'] == 'active' ? 'Block' : 'Activate'; ?>
+                                <!-- Toggle Button: Active = Block (Red), Blocked/Empty = Inactive (Yellow) -->
+                                <?php $is_active = ($user['status'] == 'active'); ?>
+                                <a href="?toggle=<?php echo $user['id']; ?>" class="btn btn-sm <?php echo $is_active ? 'btn-danger' : 'btn-warning'; ?>">
+                                    <?php echo $is_active ? 'Block' : 'Inactive'; ?>
                                 </a>
                                 <a href="?delete=<?php echo $user['id']; ?>" class="btn btn-danger btn-sm" onclick="return confirm('Delete this user?')">
                                     <i class="fas fa-trash"></i>
@@ -961,7 +976,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <select name="status" required>
                         <option value="active">Active</option>
                         <option value="pending">Pending</option>
-                        <option value="blocked">Blocked</option>
+                        <option value="blocked">Inactive</option>
                     </select>
                 </div>
             </div>
@@ -1013,7 +1028,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <select name="status" id="edit_status" required>
                         <option value="active">Active</option>
                         <option value="pending">Pending</option>
-                        <option value="blocked">Blocked</option>
+                        <option value="blocked">Inactive</option>
                     </select>
                 </div>
             </div>
