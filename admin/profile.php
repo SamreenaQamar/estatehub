@@ -903,6 +903,20 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin-bottom:8px;
 }
 
+/* ===== ICON STYLING - Black/Gray like Seller Dashboard ===== */
+.form-group label i {
+    color: #4B5563; /* Gray-600 - matches seller dashboard style */
+    margin-right: 8px;
+    width: 16px;
+    text-align: center;
+}
+.right-card .form-group label i {
+    color: #4B5563;
+    margin-right: 8px;
+    width: 16px;
+    text-align: center;
+}
+
 .form-group input,
 .form-group textarea{
     width:100%;
@@ -1374,27 +1388,27 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <form method="POST" enctype="multipart/form-data">
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Full Name</label>
+                                <label><i class="fas fa-user"></i> Full Name</label>
                                 <input type="text" name="full_name" value="<?php echo htmlspecialchars($user['full_name'] ?? ''); ?>" required>
                             </div>
                             <div class="form-group">
-                                <label>Email Address</label>
+                                <label><i class="fas fa-envelope"></i> Email Address</label>
                                 <div class="email-display"><?php echo htmlspecialchars($user['email'] ?? ''); ?></div>
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Phone Number</label>
+                                <label><i class="fas fa-phone"></i> Phone Number</label>
                                 <input type="text" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? '+92 300 1234567'); ?>">
                             </div>
                             <div class="form-group">
-                                <label>City</label>
+                                <label><i class="fas fa-map-marker-alt"></i> City</label>
                                 <input type="text" name="city" value="<?php echo htmlspecialchars($user['city'] ?? 'Lahore'); ?>">
                             </div>
                         </div>
                         <?php if ($has_bio_column): ?>
                             <div class="form-group">
-                                <label>Bio (Optional)</label>
+                                <label><i class="fas fa-file-alt"></i> Bio (Optional)</label>
                                 <input type="text" name="bio" value="<?php echo htmlspecialchars($user['bio'] ?? ''); ?>" placeholder="Short bio or extra note">
                             </div>
                         <?php endif; ?>
@@ -1413,21 +1427,21 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     </div>
                     <form method="POST">
                         <div class="form-group">
-                            <label>Current Password</label>
+                            <label><i class="fas fa-key"></i> Current Password</label>
                             <div class="password-field">
                                 <input type="password" name="current_password" placeholder="Enter current password" required>
                                 <button type="button" class="password-toggle" onclick="togglePw(this)"><i class="fas fa-eye"></i></button>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>New Password</label>
+                            <label><i class="fas fa-lock"></i> New Password</label>
                             <div class="password-field">
                                 <input type="password" name="new_password" placeholder="Enter new password" required>
                                 <button type="button" class="password-toggle" onclick="togglePw(this)"><i class="fas fa-eye"></i></button>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>Confirm Password</label>
+                            <label><i class="fas fa-check-circle"></i> Confirm Password</label>
                             <div class="password-field">
                                 <input type="password" name="confirm_password" placeholder="Confirm new password" required>
                                 <button type="button" class="password-toggle" onclick="togglePw(this)"><i class="fas fa-eye"></i></button>
