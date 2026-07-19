@@ -1,4 +1,4 @@
-<?php
+<!-- <?php
 $page_title = 'About';
 include 'includes/config.php';
 include 'includes/header.php';
@@ -173,4 +173,4 @@ include 'includes/header.php';
 
 <?php include 'includes/footer.php'; ?>
 </body>
-</html>
+</html> -->
