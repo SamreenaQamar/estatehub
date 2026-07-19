@@ -7,60 +7,123 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] != 'admin') {
     exit();
 }
 
-if (isset($_GET['read'])) {
-    $id = (int)$_GET['read'];
-    mysqli_query($conn, "UPDATE messages SET is_read = 1 WHERE id = $id");
-    header("Location: manage-messages.php?filter=" . ($_GET['filter'] ?? 'all'));
-    exit();
+// ================================================================
+// TIME AGO FUNCTION
+// ================================================================
+function time_ago($datetime) {
+    if (empty($datetime)) return 'Just now';
+    $diff = time() - strtotime($datetime);
+    if ($diff < 60) return 'Just now';
+    if ($diff < 3600) return floor($diff / 60) . ' min ago';
+    if ($diff < 86400) return floor($diff / 3600) . 'h ago';
+    if ($diff < 172800) return 'Yesterday';
+    return floor($diff / 86400) . ' days ago';
+}
+// ================================================================
+
+$admin_id = $_SESSION['user_id'];
+$admin_name = $_SESSION['user_name'] ?? 'Admin';
+
+// ===== UNREAD CONVERSATIONS COUNT (not total messages) =====
+// Count distinct (sender_id, property_id) where admin is receiver and is_read = 0
+$unread_conversations = 0;
+$query = "SELECT COUNT(DISTINCT sender_id, property_id) as total 
+          FROM messages 
+          WHERE receiver_id = $admin_id AND is_read = 0";
+$result = mysqli_query($conn, $query);
+if ($result) {
+    $unread_conversations = (int)mysqli_fetch_assoc($result)['total'];
 }
 
-if (isset($_GET['delete'])) {
-    $id = (int)$_GET['delete'];
-    mysqli_query($conn, "DELETE FROM messages WHERE id = $id");
-    header("Location: manage-messages.php?filter=" . ($_GET['filter'] ?? 'all'));
-    exit();
+// ================================================================
+// FETCH ALL CONVERSATIONS (admin is either sender or receiver)
+// ================================================================
+$conversations = [];
+$query = "
+    SELECT 
+        CASE 
+            WHEN m.sender_id = $admin_id THEN m.receiver_id 
+            ELSE m.sender_id 
+        END as other_user_id,
+        m.property_id,
+        u.id as user_id,
+        u.full_name,
+        u.email,
+        u.phone,
+        u.profile_pic,
+        p.id as prop_id,
+        p.title as prop_title,
+        p.location as prop_location,
+        p.price as prop_price,
+        (SELECT COUNT(*) FROM messages 
+         WHERE ((sender_id = other_user_id AND receiver_id = $admin_id) OR (sender_id = $admin_id AND receiver_id = other_user_id))
+           AND property_id = m.property_id 
+           AND is_read = 0 AND receiver_id = $admin_id) as unread_count,
+        (SELECT message FROM messages 
+         WHERE ((sender_id = other_user_id AND receiver_id = $admin_id) OR (sender_id = $admin_id AND receiver_id = other_user_id))
+           AND property_id = m.property_id 
+         ORDER BY created_at DESC LIMIT 1) as last_message,
+        (SELECT created_at FROM messages 
+         WHERE ((sender_id = other_user_id AND receiver_id = $admin_id) OR (sender_id = $admin_id AND receiver_id = other_user_id))
+           AND property_id = m.property_id 
+         ORDER BY created_at DESC LIMIT 1) as last_time
+    FROM messages m
+    JOIN users u ON u.id = (CASE WHEN m.sender_id = $admin_id THEN m.receiver_id ELSE m.sender_id END)
+    LEFT JOIN properties p ON p.id = m.property_id
+    WHERE m.sender_id = $admin_id OR m.receiver_id = $admin_id
+    GROUP BY other_user_id, m.property_id
+    ORDER BY last_time DESC
+";
+$result = mysqli_query($conn, $query);
+if ($result) {
+    while ($row = mysqli_fetch_assoc($result)) {
+        $conversations[] = $row;
+    }
 }
 
-if (isset($_POST['reply'])) {
-    $msg_id = (int)$_POST['message_id'];
-    $reply = mysqli_real_escape_string($conn, $_POST['reply_message']);
+// ================================================================
+// SELECTED CONVERSATION
+// ================================================================
+$selected_conversation = null;
+$selected_sender_id = isset($_GET['sender']) ? (int)$_GET['sender'] : 0;
+$selected_property_id = isset($_GET['property']) ? (int)$_GET['property'] : 0;
+$messages_thread = [];
 
-    $result = mysqli_query($conn, "SELECT sender_id, property_id FROM messages WHERE id = $msg_id");
-    $msg = mysqli_fetch_assoc($result);
-
-    $admin_id = $_SESSION['user_id'];
-    $sender_id = $msg['sender_id'];
-    $property_id = $msg['property_id'];
-
-    mysqli_query($conn,
-        "INSERT INTO messages (sender_id, receiver_id, property_id, message, is_read, created_at) 
-         VALUES ($admin_id, $sender_id, $property_id, 'Admin Reply: $reply', 0, NOW())"
-    );
-
-    mysqli_query($conn, "UPDATE messages SET is_read = 1 WHERE id = $msg_id");
-
-    $message_sent = "Reply sent successfully!";
+if ($selected_sender_id && $selected_property_id) {
+    $msg_query = "
+        SELECT m.*, u.full_name as sender_name, u.profile_pic as sender_pic
+        FROM messages m
+        JOIN users u ON u.id = m.sender_id
+        WHERE (m.sender_id = $selected_sender_id AND m.receiver_id = $admin_id AND m.property_id = $selected_property_id)
+           OR (m.sender_id = $admin_id AND m.receiver_id = $selected_sender_id AND m.property_id = $selected_property_id)
+        ORDER BY m.created_at ASC
+    ";
+    $msg_result = mysqli_query($conn, $msg_query);
+    if ($msg_result) {
+        while ($row = mysqli_fetch_assoc($msg_result)) {
+            $messages_thread[] = $row;
+        }
+    }
+    // Mark messages from sender to admin as read
+    mysqli_query($conn, "UPDATE messages SET is_read = 1 WHERE sender_id = $selected_sender_id AND receiver_id = $admin_id AND property_id = $selected_property_id");
+    
+    // Get conversation details for header
+    $conv_query = "
+        SELECT u.id, u.full_name, u.email, u.phone, u.profile_pic,
+               p.id as prop_id, p.title as prop_title, p.location as prop_location, p.price as prop_price
+        FROM users u
+        LEFT JOIN properties p ON p.id = $selected_property_id
+        WHERE u.id = $selected_sender_id
+    ";
+    $conv_result = mysqli_query($conn, $conv_query);
+    if ($conv_result) {
+        $selected_conversation = mysqli_fetch_assoc($conv_result);
+    }
 }
 
-$filter = isset($_GET['filter']) ? $_GET['filter'] : 'all';
-
-$query = "SELECT m.*, u.full_name as sender_name, u.email as sender_email, p.title as property_title 
-          FROM messages m 
-          JOIN users u ON m.sender_id = u.id 
-          LEFT JOIN properties p ON m.property_id = p.id 
-          WHERE 1 = 1";
-
-if ($filter == 'unread') {
-    $query .= " AND m.is_read = 0";
-} elseif ($filter == 'read') {
-    $query .= " AND m.is_read = 1";
-}
-
-$query .= " ORDER BY m.created_at DESC";
-
-$messages = mysqli_query($conn, $query);
-$total = mysqli_num_rows($messages);
-
+// ================================================================
+// SIDEBAR STATS (for total users, pending, etc.)
+// ================================================================
 $stats = [
     'users' => 0,
     'pending' => 0,
@@ -68,35 +131,25 @@ $stats = [
 ];
 
 $result = mysqli_query($conn, "SELECT COUNT(*) as total FROM users");
-if ($result && mysqli_num_rows($result) > 0) {
-    $stats['users'] = mysqli_fetch_assoc($result)['total'] ?? 0;
-}
+if ($result) $stats['users'] = (int)mysqli_fetch_assoc($result)['total'];
 
 $result = mysqli_query($conn, "SELECT COUNT(*) as total FROM properties WHERE status = 'Pending'");
-if ($result && mysqli_num_rows($result) > 0) {
-    $stats['pending'] = mysqli_fetch_assoc($result)['total'] ?? 0;
-}
+if ($result) $stats['pending'] = (int)mysqli_fetch_assoc($result)['total'];
 
-$result = mysqli_query($conn, "SELECT COUNT(*) as total FROM messages WHERE is_read = 0");
-if ($result && mysqli_num_rows($result) > 0) {
-    $stats['unread'] = mysqli_fetch_assoc($result)['total'] ?? 0;
-}
+// For sidebar Messages badge, we'll use unread_conversations (not total unread messages)
+$stats['unread'] = $unread_conversations;
 
-$admin_id = $_SESSION['user_id'];
+$page_title = 'Messages';
+$current_page = basename($_SERVER['PHP_SELF']);
+
+// Admin profile pic
 $profile_pic_path = '';
 $upload_dir = "../uploads/profiles/";
-
-if (!is_dir($upload_dir)) {
-    mkdir($upload_dir, 0777, true);
-}
-
+if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
 $found = glob($upload_dir . "admin_" . $admin_id . "_*");
 if (!empty($found)) {
     $profile_pic_path = $found[0] . '?t=' . time();
 }
-
-$page_title = 'Messages';
-$current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -104,15 +157,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo $page_title; ?> - EstateHub Admin</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
+        /* ===== RESET & BASE ===== */
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Inter', sans-serif; }
         body { background:#f4f6f5; min-height:100vh; }
 
         .dashboard-wrapper { display:flex; min-height:100vh; background:#f4f6f5; }
 
-        /* ===== SIDEBAR - SAME AS SELLER ===== */
+        /* ===== SIDEBAR ===== */
         .sidebar {
             width: 250px;
             min-width: 250px;
@@ -128,7 +182,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .sidebar::-webkit-scrollbar { width:4px; }
         .sidebar::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:10px; }
 
-        /* ===== LOGO - SAME AS SELLER ===== */
         .logo {
             padding:0 4px 20px;
             margin-bottom:20px;
@@ -163,7 +216,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             border-radius:10px;
         }
 
-        /* ===== SIDEBAR MENU ===== */
         .sidebar-label {
             font-size: 11px;
             font-weight: 600;
@@ -231,7 +283,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
         }
         .nav-badge.blue { background: #0E7A4E; }
 
-        /* ===== LOGOUT LINK ===== */
         .logout-link {
             color:#b8c2cc !important;
         }
@@ -240,10 +291,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             color:#fff !important;
             box-shadow:0 8px 20px rgba(220,38,38,.35) !important;
         }
-
-        /* ===== MAIN CONTENT ===== */
-        .main-content { flex:1; overflow-y:auto; }
-        .content-inner { padding:28px 32px 40px; }
 
         /* ===== TOP BAR ===== */
         .topbar {
@@ -274,30 +321,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .topbar-search svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:#adb5bd; }
 
         .topbar-actions { display:flex; align-items:center; gap:16px; }
-        .icon-btn {
-            position: relative;
-            width: 38px;
-            height: 38px;
-            border-radius: 10px;
-            background: #f8fafc;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition:0.2s;
-            color:#1e293b;
-        }
-        .icon-btn:hover { background:#e9ecef; }
-        .icon-btn svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2; }
-        .icon-btn .count {
-            position:absolute; top:-4px; right:-4px;
-            background:#ef4444; color:#fff;
-            font-size:10px; font-weight:700;
-            min-width:18px; height:18px; border-radius:50%;
-            display:flex; align-items:center; justify-content:center;
-            border:2px solid #fff;
-        }
+        /* Removed notification bell icon */
         .user-chip { display:flex; align-items:center; gap:10px; text-decoration:none; }
         .user-avatar {
             width:36px; height:36px; border-radius:10px;
@@ -311,285 +335,455 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .user-name { font-size:14px; font-weight:700; color:#0b1a2e; }
         .user-role { font-size:12px; color:#6b7a8f; }
 
-        /* ===== CONTENT ===== */
-        .page-header {
-            margin-bottom:28px;
-        }
-        .page-header h1 {
-            font-size:24px;
-            font-weight:800;
-            color:#0b1a2e;
-        }
-        .page-header p {
-            font-size:14px;
-            color:#64748b;
-            margin-top:4px;
-        }
+        /* ===== MAIN CONTENT ===== */
+        .main-content { flex:1; overflow:hidden; display:flex; flex-direction:column; }
+        .content-inner { flex:1; padding:24px 32px 32px; overflow:hidden; display:flex; flex-direction:column; }
 
-        /* ===== FILTER TABS ===== */
-        .filter-tabs {
+        /* ===== MESSAGES LAYOUT ===== */
+        .messages-container {
             display:flex;
-            gap:10px;
-            margin-bottom:24px;
-            flex-wrap:wrap;
-        }
-        .filter-tab {
-            padding:10px 22px;
-            border-radius:30px;
-            font-size:13px;
-            font-weight:700;
-            border:2px solid #e9ecef;
-            background:white;
-            cursor:pointer;
-            transition:.3s;
-            text-decoration:none;
-            color:#475569;
-        }
-        .filter-tab:hover,
-        .filter-tab.active {
-            background:#0E7A4E;
-            color:white;
-            border-color:#0E7A4E;
-        }
-        .filter-tab .count {
-            background:rgba(255,255,255,0.2);
-            padding:1px 10px;
-            border-radius:20px;
-            font-size:11px;
-            margin-left:4px;
-        }
-        .filter-tab.active .count {
-            background:rgba(255,255,255,0.25);
+            flex:1;
+            gap:20px;
+            min-height:0;
+            height:100%;
         }
 
-        /* ===== MESSAGE CARDS ===== */
-        .message-card {
+        /* Left Panel - Conversation List */
+        .conversation-list {
+            width:360px;
+            min-width:360px;
             background:#fff;
             border-radius:18px;
-            padding:24px 28px;
             border:1px solid #edf2f7;
-            margin-bottom:16px;
-            transition:.3s;
-            position:relative;
-        }
-        .message-card:hover {
-            box-shadow:0 8px 30px rgba(0,0,0,0.06);
-            transform:translateY(-2px);
-        }
-        .message-card.unread {
-            border-left:4px solid #0E7A4E;
-            background:#fafffe;
-        }
-        .message-card.unread .sender-name {
-            color:#0E7A4E;
-        }
-
-        .message-header {
             display:flex;
-            justify-content:space-between;
-            align-items:flex-start;
-            margin-bottom:12px;
-            flex-wrap:wrap;
-            gap:8px;
+            flex-direction:column;
+            overflow:hidden;
         }
-        .sender-info {
+        .conversation-list .header {
+            padding:16px 20px;
+            border-bottom:1px solid #edf2f7;
+        }
+        .conversation-list .header h2 {
+            font-size:18px;
+            font-weight:800;
+        }
+        .conversation-list .search-box {
+            padding:12px 16px;
+            border-bottom:1px solid #edf2f7;
+        }
+        .conversation-list .search-box input {
+            width:100%;
+            padding:8px 14px;
+            border:1px solid #e9ecef;
+            border-radius:8px;
+            font-size:13px;
+            outline:none;
+        }
+        .conversation-list .search-box input:focus {
+            border-color:#0E7A4E;
+        }
+        .conversation-items {
+            flex:1;
+            overflow-y:auto;
+            padding:4px 0;
+        }
+        .conversation-items::-webkit-scrollbar { width:4px; }
+        .conversation-items::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:10px; }
+
+        .conversation-item {
             display:flex;
             align-items:center;
-            gap:14px;
+            padding:12px 16px;
+            cursor:pointer;
+            transition:0.2s;
+            border-left:3px solid transparent;
+            gap:12px;
         }
-        .sender-avatar {
+        .conversation-item:hover {
+            background:#f8fafc;
+        }
+        .conversation-item.active {
+            background:#ecfdf5;
+            border-left-color:#0E7A4E;
+        }
+        .conversation-item .avatar {
             width:44px;
             height:44px;
-            border-radius:12px;
+            border-radius:50%;
+            background:#e9ecef;
             display:flex;
             align-items:center;
             justify-content:center;
             font-weight:700;
-            font-size:17px;
-            color:white;
-            flex-shrink:0;
-        }
-        .sender-avatar.avatar-green {
-            background:linear-gradient(135deg,#0E7A4E,#16a34a);
-        }
-        .sender-details .sender-name {
             font-size:16px;
+            color:#0E7A4E;
+            flex-shrink:0;
+            overflow:hidden;
+        }
+        .conversation-item .avatar img {
+            width:100%; height:100%; object-fit:cover;
+        }
+        .conversation-item .details {
+            flex:1;
+            min-width:0;
+        }
+        .conversation-item .details .name {
+            font-size:14px;
             font-weight:700;
             color:#0b1a2e;
         }
-        .sender-details .sender-email {
-            font-size:12px;
-            color:#94a3b8;
-            font-weight:500;
-        }
-        .message-time {
-            font-size:12px;
-            color:#94a3b8;
-            font-weight:500;
-            white-space:nowrap;
-        }
-
-        .message-body {
-            font-size:14.5px;
-            color:#334155;
-            line-height:1.7;
-            margin-bottom:14px;
-            padding:0 0 0 58px;
-        }
-
-        .property-ref {
+        .conversation-item .details .last-msg {
             font-size:13px;
-            color:#0E7A4E;
-            font-weight:600;
-            padding:0 0 0 58px;
-            margin-bottom:12px;
+            color:#64748b;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
         }
-        .property-ref i {
-            margin-right:6px;
+        .conversation-item .details .property-title {
+            font-size:11px;
+            color:#94a3b8;
+            margin-top:2px;
+        }
+        .conversation-item .right {
+            text-align:right;
+            flex-shrink:0;
+        }
+        .conversation-item .right .time {
+            font-size:11px;
+            color:#94a3b8;
+        }
+        .conversation-item .right .unread {
+            display:inline-block;
+            background:#ef4444;
+            color:#fff;
+            font-size:10px;
+            font-weight:700;
+            min-width:20px;
+            height:20px;
+            border-radius:50%;
+            text-align:center;
+            line-height:20px;
+            padding:0 6px;
+            margin-top:4px;
         }
 
-        .message-actions {
+        /* Right Panel - Conversation View */
+        .conversation-view {
+            flex:1;
+            background:#fff;
+            border-radius:18px;
+            border:1px solid #edf2f7;
+            display:flex;
+            flex-direction:column;
+            overflow:hidden;
+            min-width:0;
+        }
+        .conversation-view .view-header {
+            padding:16px 24px;
+            border-bottom:1px solid #edf2f7;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            flex-wrap:wrap;
+            gap:12px;
+        }
+        .view-header .contact-info {
+            display:flex;
+            align-items:center;
+            gap:12px;
+        }
+        .view-header .contact-info .avatar {
+            width:40px;
+            height:40px;
+            border-radius:50%;
+            background:#e9ecef;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-weight:700;
+            font-size:16px;
+            color:#0E7A4E;
+            overflow:hidden;
+            flex-shrink:0;
+        }
+        .view-header .contact-info .avatar img {
+            width:100%; height:100%; object-fit:cover;
+        }
+        .view-header .contact-info .name {
+            font-size:16px;
+            font-weight:700;
+        }
+        .view-header .contact-info .email {
+            font-size:12px;
+            color:#64748b;
+        }
+        .view-header .actions {
             display:flex;
             gap:8px;
-            padding:0 0 0 58px;
-            flex-wrap:wrap;
         }
-
-        .btn {
-            padding:8px 18px;
-            border-radius:30px;
-            font-size:12px;
-            font-weight:700;
+        .view-header .actions button {
+            background:none;
             border:none;
             cursor:pointer;
-            transition:.3s;
-            display:inline-flex;
-            align-items:center;
-            gap:6px;
-            text-decoration:none;
-            font-family:'Inter',sans-serif;
+            font-size:16px;
+            padding:6px 8px;
+            border-radius:8px;
+            transition:0.2s;
+            color:#64748b;
         }
-        .btn-primary {
-            background:#0E7A4E;
-            color:white;
-        }
-        .btn-primary:hover {
-            background:#0a5c3a;
-            transform:translateY(-2px);
-            box-shadow:0 4px 12px rgba(14,122,78,.3);
-        }
-        .btn-ghost {
+        .view-header .actions button:hover {
             background:#f1f5f9;
+            color:#0b1a2e;
+        }
+        .view-header .actions .delete-conv {
+            color:#ef4444;
+        }
+        .view-header .actions .delete-conv:hover {
+            background:#fee2e2;
+        }
+
+        /* Property Info Bar */
+        .property-info-bar {
+            padding:12px 24px;
+            background:#f8fafc;
+            border-bottom:1px solid #edf2f7;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            flex-wrap:wrap;
+            gap:8px;
+        }
+        .property-info-bar .prop-details {
+            display:flex;
+            align-items:center;
+            gap:12px;
+            font-size:13px;
+        }
+        .property-info-bar .prop-details strong {
+            color:#0b1a2e;
+        }
+        .property-info-bar .prop-details .price {
+            color:#0E7A4E;
+            font-weight:700;
+        }
+
+        /* Messages Thread */
+        .messages-thread {
+            flex:1;
+            overflow-y:auto;
+            padding:16px 24px;
+            display:flex;
+            flex-direction:column;
+            gap:8px;
+        }
+        .messages-thread::-webkit-scrollbar { width:4px; }
+        .messages-thread::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:10px; }
+
+        .message-item {
+            display:flex;
+            flex-direction:column;
+            max-width:75%;
+            padding:10px 16px;
+            border-radius:12px;
+            background:#f1f5f9;
+            align-self:flex-start;
+            position:relative;
+        }
+        .message-item.sent {
+            background:#0E7A4E;
+            color:#fff;
+            align-self:flex-end;
+        }
+        .message-item .msg-text {
+            font-size:14px;
+            line-height:1.5;
+            word-wrap:break-word;
+        }
+        .message-item .msg-time {
+            font-size:10px;
+            color:#94a3b8;
+            margin-top:4px;
+            align-self:flex-end;
+        }
+        .message-item.sent .msg-time {
+            color:#d1fae5;
+        }
+        .message-item .msg-actions {
+            position:absolute;
+            top:4px;
+            right:4px;
+            display:none;
+            gap:4px;
+        }
+        .message-item:hover .msg-actions {
+            display:flex;
+        }
+        .message-item .msg-actions button {
+            background:rgba(255,255,255,0.8);
+            border:none;
+            border-radius:4px;
+            padding:2px 6px;
+            cursor:pointer;
+            font-size:10px;
             color:#475569;
         }
-        .btn-ghost:hover {
-            background:#e2e8f0;
+        .message-item .msg-actions button:hover {
+            background:#fff;
+            color:#0b1a2e;
         }
-        .btn-danger {
-            background:#ef4444;
-            color:white;
+        .message-item.sent .msg-actions button {
+            background:rgba(0,0,0,0.2);
+            color:#fff;
         }
-        .btn-danger:hover {
-            background:#dc2626;
+        .message-item.sent .msg-actions button:hover {
+            background:rgba(0,0,0,0.4);
         }
-        .btn-sm { padding:6px 14px; font-size:11px; }
 
-        /* ===== REPLY BOX ===== */
-        .reply-box {
-            display:none;
-            padding:16px 0 0 58px;
-            margin-top:12px;
+        /* Message Input */
+        .message-input {
+            padding:12px 24px 20px;
             border-top:1px solid #edf2f7;
+            display:flex;
+            gap:12px;
+            align-items:center;
         }
-        .reply-box.active {
-            display:block;
-        }
-        .reply-box textarea {
-            width:100%;
-            padding:12px 16px;
-            border:2px solid #e9ecef;
-            border-radius:14px;
+        .message-input textarea {
+            flex:1;
+            padding:10px 14px;
+            border:1px solid #e9ecef;
+            border-radius:10px;
             font-size:14px;
-            resize:vertical;
-            min-height:80px;
-            font-family:'Inter',sans-serif;
-            transition:.3s;
-        }
-        .reply-box textarea:focus {
+            resize:none;
+            height:44px;
             outline:none;
-            border-color:#0E7A4E;
-            box-shadow:0 0 0 4px rgba(14,122,78,.10);
+            transition:0.2s;
         }
-        .reply-box .btn {
-            margin-top:10px;
+        .message-input textarea:focus {
+            border-color:#0E7A4E;
+            box-shadow:0 0 0 3px rgba(14,122,78,0.08);
+        }
+        .message-input button {
+            background:#0E7A4E;
+            color:#fff;
+            border:none;
+            border-radius:10px;
+            padding:10px 20px;
+            font-weight:700;
+            cursor:pointer;
+            transition:0.2s;
+            height:44px;
+            display:flex;
+            align-items:center;
+            gap:8px;
+        }
+        .message-input button:hover {
+            background:#0a5c3a;
+            transform:translateY(-2px);
+            box-shadow:0 6px 20px rgba(14,122,78,0.25);
         }
 
-        /* ===== EMPTY STATE ===== */
+        /* Empty state */
         .empty-state {
-            text-align:center;
-            padding:60px 20px;
+            flex:1;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
             color:#94a3b8;
+            text-align:center;
+            padding:40px;
         }
-        .empty-state .icon {
-            font-size:56px;
-            color:#d1d5db;
+        .empty-state i {
+            font-size:48px;
             margin-bottom:16px;
-            display:block;
+            color:#cbd5e1;
         }
         .empty-state h3 {
             font-size:18px;
-            font-weight:700;
             color:#475569;
-            margin-bottom:6px;
+            margin-bottom:8px;
         }
         .empty-state p {
             font-size:14px;
         }
 
-        /* ===== ALERT ===== */
-        .alert {
-            padding:14px 20px;
-            border-radius:14px;
-            margin-bottom:20px;
-            font-size:14px;
-            font-weight:600;
-            display:flex;
+        /* Modal for delete confirmation */
+        .modal-overlay {
+            position:fixed;
+            top:0; left:0; right:0; bottom:0;
+            background:rgba(0,0,0,0.5);
+            backdrop-filter:blur(4px);
+            z-index:1000;
+            display:none;
             align-items:center;
-            gap:10px;
+            justify-content:center;
         }
-        .alert-success {
-            background:#dcfce7;
-            color:#15803d;
-            border:1px solid #86efac;
+        .modal-overlay.active { display:flex; }
+        .modal {
+            background:#fff;
+            border-radius:20px;
+            padding:28px 32px;
+            max-width:420px;
+            width:90%;
+            text-align:center;
+        }
+        .modal h3 {
+            font-size:20px;
+            font-weight:800;
+            margin-bottom:12px;
+        }
+        .modal p {
+            color:#64748b;
+            margin-bottom:24px;
+        }
+        .modal .actions {
+            display:flex;
+            gap:12px;
+            justify-content:center;
+        }
+        .modal .actions button {
+            padding:10px 24px;
+            border:none;
+            border-radius:10px;
+            font-weight:700;
+            cursor:pointer;
+            transition:0.2s;
+        }
+        .modal .actions .btn-cancel {
+            background:#f1f5f9;
+            color:#475569;
+        }
+        .modal .actions .btn-cancel:hover {
+            background:#e2e8f0;
+        }
+        .modal .actions .btn-danger {
+            background:#ef4444;
+            color:#fff;
+        }
+        .modal .actions .btn-danger:hover {
+            background:#dc2626;
         }
 
-        /* ===== RESPONSIVE ===== */
         @media (max-width:1100px) {
             .sidebar { position:fixed; left:-280px; transition:left 0.3s; }
             .sidebar.open { left:0; }
             .topbar-menu-btn { display:flex; }
+            .conversation-list { width:300px; min-width:300px; }
         }
         @media (max-width:768px) {
-            .content-inner { padding:16px; }
-            .topbar { padding:12px 16px; flex-wrap:wrap; }
-            .message-card { padding:18px 16px; }
-            .message-body,
-            .property-ref,
-            .message-actions,
-            .reply-box {
-                padding-left:0;
-            }
-            .message-header { flex-direction:column; }
-            .message-time { align-self:flex-start; }
-            .sender-avatar { width:38px; height:38px; font-size:14px; }
-            .topbar-search { max-width:none; }
+            .messages-container { flex-direction:column; }
+            .conversation-list { width:100%; min-width:0; height:300px; }
+            .conversation-view { flex:1; min-height:400px; }
+            .content-inner { padding:12px; }
+            .topbar { padding:12px 18px; }
+            .user-info { display:none; }
         }
     </style>
 </head>
 <body>
 <div class="dashboard-wrapper">
 
-    <!-- ===== SIDEBAR - SAME AS SELLER ===== -->
+    <!-- ===== SIDEBAR (ADMIN) ===== -->
     <aside class="sidebar" id="adminSidebar">
         <div class="logo">
             <a href="../index.php">
@@ -682,7 +876,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- ===== MAIN CONTENT ===== -->
     <div class="main-content">
 
-        <!-- TOP BAR -->
+        <!-- TOP BAR (notification bell removed) -->
         <header class="topbar">
             <button class="topbar-menu-btn" onclick="document.getElementById('adminSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -694,10 +888,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             </div>
 
             <div class="topbar-actions">
-                <button class="icon-btn" title="Notifications">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                    <span class="count">3</span>
-                </button>
+                <!-- Notification bell removed -->
                 <a href="profile.php" class="user-chip">
                     <div class="user-avatar">
                         <?php if (!empty($profile_pic_path)): ?>
@@ -716,117 +907,412 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
         <div class="content-inner">
 
-            <!-- Page Header -->
-            <div class="page-header">
-                <h1>Message Center</h1>
-                <p>View and manage all user messages and inquiries</p>
-            </div>
+            <!-- ===== MESSAGES CONTAINER ===== -->
+            <div class="messages-container">
 
-            <?php if (isset($message_sent)): ?>
-                <div class="alert alert-success">
-                    <i class="fas fa-check-circle"></i> <?php echo $message_sent; ?>
+                <!-- LEFT PANEL - Conversation List -->
+                <div class="conversation-list">
+                    <div class="header">
+                        <h2>Messages</h2>
+                    </div>
+                    <div class="search-box">
+                        <input type="text" id="searchConv" placeholder="Search messages..." onkeyup="filterConversations()">
+                    </div>
+                    <div class="conversation-items" id="convList">
+                        <?php if (empty($conversations)): ?>
+                            <div style="padding:40px 20px; text-align:center; color:#94a3b8;">
+                                <i class="fas fa-inbox" style="font-size:32px; display:block; margin-bottom:12px;"></i>
+                                <p>No conversations yet</p>
+                            </div>
+                        <?php else: ?>
+                            <?php foreach ($conversations as $conv):
+                                $is_active = ($selected_sender_id == $conv['other_user_id'] && $selected_property_id == $conv['property_id']);
+                                $avatar = !empty($conv['profile_pic']) && file_exists("../uploads/profiles/".$conv['profile_pic']) ? "../uploads/profiles/".$conv['profile_pic'] : '';
+                                $initials = strtoupper(substr($conv['full_name'], 0, 1));
+                                $time = time_ago($conv['last_time']);
+                                $unread = (int)$conv['unread_count'];
+                            ?>
+                            <div class="conversation-item <?php echo $is_active ? 'active' : ''; ?>" 
+                                 data-sender="<?php echo $conv['other_user_id']; ?>" 
+                                 data-property="<?php echo $conv['property_id']; ?>"
+                                 onclick="selectConversation(<?php echo $conv['other_user_id']; ?>, <?php echo $conv['property_id']; ?>)">
+                                <div class="avatar">
+                                    <?php if ($avatar): ?>
+                                        <img src="<?php echo $avatar; ?>" alt="">
+                                    <?php else: ?>
+                                        <?php echo $initials; ?>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="details">
+                                    <div class="name"><?php echo htmlspecialchars($conv['full_name']); ?></div>
+                                    <div class="last-msg"><?php echo htmlspecialchars(substr($conv['last_message'], 0, 60)); ?></div>
+                                    <div class="property-title"><?php echo htmlspecialchars($conv['prop_title'] ?? 'Property'); ?></div>
+                                </div>
+                                <div class="right">
+                                    <div class="time"><?php echo $time; ?></div>
+                                    <?php if ($unread > 0): ?>
+                                        <div class="unread"><?php echo $unread; ?></div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
                 </div>
-            <?php endif; ?>
 
-            <!-- Filter Tabs -->
-            <div class="filter-tabs">
-                <a href="?filter=all" class="filter-tab <?php echo $filter == 'all' ? 'active' : ''; ?>">
-                    All <span class="count"><?php echo $total; ?></span>
-                </a>
-                <a href="?filter=unread" class="filter-tab <?php echo $filter == 'unread' ? 'active' : ''; ?>">
-                    Unread <span class="count"><?php echo $stats['unread']; ?></span>
-                </a>
-                <a href="?filter=read" class="filter-tab <?php echo $filter == 'read' ? 'active' : ''; ?>">
-                    Read
-                </a>
-            </div>
-
-            <!-- Messages -->
-            <?php if ($messages && mysqli_num_rows($messages) > 0): ?>
-                <?php while ($msg = mysqli_fetch_assoc($messages)): ?>
-                    <div class="message-card <?php echo $msg['is_read'] ? '' : 'unread'; ?>">
-                        <div class="message-header">
-                            <div class="sender-info">
-                                <div class="sender-avatar avatar-green">
-                                    <?php echo strtoupper(substr($msg['sender_name'], 0, 1)); ?>
+                <!-- RIGHT PANEL - Conversation View -->
+                <div class="conversation-view" id="conversationView">
+                    <?php if ($selected_conversation && !empty($messages_thread)): ?>
+                        <!-- Header with contact info -->
+                        <div class="view-header">
+                            <div class="contact-info">
+                                <div class="avatar">
+                                    <?php 
+                                        $avatar = !empty($selected_conversation['profile_pic']) && file_exists("../uploads/profiles/".$selected_conversation['profile_pic']) 
+                                            ? "../uploads/profiles/".$selected_conversation['profile_pic'] 
+                                            : '';
+                                        $initials = strtoupper(substr($selected_conversation['full_name'], 0, 1));
+                                    ?>
+                                    <?php if ($avatar): ?>
+                                        <img src="<?php echo $avatar; ?>" alt="">
+                                    <?php else: ?>
+                                        <?php echo $initials; ?>
+                                    <?php endif; ?>
                                 </div>
-                                <div class="sender-details">
-                                    <div class="sender-name"><?php echo htmlspecialchars($msg['sender_name']); ?></div>
-                                    <div class="sender-email"><?php echo htmlspecialchars($msg['sender_email']); ?></div>
+                                <div>
+                                    <div class="name"><?php echo htmlspecialchars($selected_conversation['full_name']); ?></div>
+                                    <div class="email"><i class="fas fa-envelope"></i> <?php echo htmlspecialchars($selected_conversation['email']); ?></div>
                                 </div>
                             </div>
-                            <div class="message-time">
-                                <i class="far fa-clock"></i>
-                                <?php echo date('M d, Y h:i A', strtotime($msg['created_at'])); ?>
+                            <div class="actions">
+                                <button onclick="deleteConversation(<?php echo $selected_sender_id; ?>, <?php echo $selected_property_id; ?>)" title="Delete Conversation" class="delete-conv">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
                             </div>
                         </div>
 
-                        <div class="message-body">
-                            <?php echo nl2br(htmlspecialchars($msg['message'])); ?>
-                        </div>
-
-                        <?php if (!empty($msg['property_title'])): ?>
-                            <div class="property-ref">
-                                <i class="fas fa-home"></i> Regarding: <?php echo htmlspecialchars($msg['property_title']); ?>
+                        <!-- Property Info -->
+                        <?php if ($selected_conversation['prop_id']): ?>
+                        <div class="property-info-bar">
+                            <div class="prop-details">
+                                <i class="fas fa-home" style="color:#0E7A4E;"></i>
+                                <strong><?php echo htmlspecialchars($selected_conversation['prop_title']); ?></strong>
+                                <span><?php echo htmlspecialchars($selected_conversation['prop_location']); ?></span>
                             </div>
+                            <div class="price">PKR <?php echo number_format($selected_conversation['prop_price']); ?></div>
+                        </div>
                         <?php endif; ?>
 
-                        <div class="message-actions">
-                            <?php if (!$msg['is_read']): ?>
-                                <a href="?read=<?php echo $msg['id']; ?>&filter=<?php echo $filter; ?>" class="btn btn-primary btn-sm">
-                                    <i class="fas fa-check"></i> Mark as Read
-                                </a>
-                            <?php endif; ?>
-                            <button class="btn btn-ghost btn-sm" onclick="toggleReply(<?php echo $msg['id']; ?>)">
-                                <i class="fas fa-reply"></i> Reply
-                            </button>
-                            <a href="?delete=<?php echo $msg['id']; ?>&filter=<?php echo $filter; ?>" class="btn btn-danger btn-sm" onclick="return confirm('Delete this message?')">
-                                <i class="fas fa-trash"></i> Delete
-                            </a>
+                        <!-- Messages Thread -->
+                        <div class="messages-thread" id="messageThread">
+                            <?php foreach ($messages_thread as $msg):
+                                $is_sent = ($msg['sender_id'] == $admin_id);
+                                $time = date('g:i A', strtotime($msg['created_at']));
+                            ?>
+                            <div class="message-item <?php echo $is_sent ? 'sent' : ''; ?>" data-msgid="<?php echo $msg['id']; ?>">
+                                <div class="msg-text"><?php echo nl2br(htmlspecialchars($msg['message'])); ?></div>
+                                <div class="msg-time"><?php echo $time; ?></div>
+                                <?php if ($is_sent): ?>
+                                <div class="msg-actions">
+                                    <button onclick="editMessage(<?php echo $msg['id']; ?>, this)" title="Edit"><i class="fas fa-edit"></i></button>
+                                    <button onclick="deleteMessage(<?php echo $msg['id']; ?>)" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                            <?php endforeach; ?>
+                            <div id="scrollAnchor"></div>
                         </div>
 
-                        <div class="reply-box" id="reply-<?php echo $msg['id']; ?>">
-                            <form method="POST">
-                                <input type="hidden" name="message_id" value="<?php echo $msg['id']; ?>">
-                                <textarea name="reply_message" rows="3" placeholder="Type your reply to <?php echo htmlspecialchars($msg['sender_name']); ?>..."></textarea>
-                                <button type="submit" name="reply" class="btn btn-primary">
-                                    <i class="fas fa-paper-plane"></i> Send Reply
-                                </button>
-                            </form>
+                        <!-- Message Input -->
+                        <div class="message-input">
+                            <textarea id="msgInput" rows="1" placeholder="Type a message..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendMessage();}"></textarea>
+                            <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i> Send</button>
                         </div>
-                    </div>
-                <?php endwhile; ?>
-            <?php else: ?>
-                <div class="empty-state">
-                    <span class="icon"><i class="fas fa-inbox"></i></span>
-                    <h3>No messages found</h3>
-                    <p>All caught up! No messages to display.</p>
+                    <?php else: ?>
+                        <!-- Empty state -->
+                        <div class="empty-state">
+                            <i class="fas fa-comment-dots"></i>
+                            <h3>Select a conversation</h3>
+                            <p>Choose a conversation from the left to view messages</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
-            <?php endif; ?>
+
+            </div>
 
         </div>
     </div>
 </div>
 
-<script>
-function toggleReply(id) {
-    var box = document.getElementById('reply-' + id);
-    box.classList.toggle('active');
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal">
+        <h3>Confirm Delete</h3>
+        <p id="deleteMessage">Are you sure you want to delete this conversation? All messages will be permanently removed.</p>
+        <div class="actions">
+            <button class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+            <button class="btn-danger" id="confirmDeleteBtn">Delete</button>
+        </div>
+    </div>
+</div>
 
-    if (box.classList.contains('active')) {
-        var textarea = box.querySelector('textarea');
-        setTimeout(function() { textarea.focus(); }, 100);
-    }
+<script>
+// ===== CONVERSATION SELECTION =====
+function selectConversation(senderId, propertyId) {
+    window.location.href = 'manage-messages.php?sender=' + senderId + '&property=' + propertyId;
 }
 
-// Auto-close reply boxes when clicking outside
-document.addEventListener('click', function(e) {
-    var replyBoxes = document.querySelectorAll('.reply-box.active');
-    replyBoxes.forEach(function(box) {
-        if (!box.contains(e.target) && !e.target.closest('.message-actions')) {
-            box.classList.remove('active');
+// ===== FILTER CONVERSATIONS =====
+function filterConversations() {
+    const search = document.getElementById('searchConv').value.toLowerCase();
+    const items = document.querySelectorAll('.conversation-item');
+    items.forEach(item => {
+        const name = item.querySelector('.name').textContent.toLowerCase();
+        const lastMsg = item.querySelector('.last-msg').textContent.toLowerCase();
+        if (name.includes(search) || lastMsg.includes(search)) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
         }
     });
+}
+
+// ===== SEND MESSAGE =====
+function sendMessage() {
+    const input = document.getElementById('msgInput');
+    const msg = input.value.trim();
+    if (!msg) {
+        alert('Please type a message.');
+        return;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const senderId = urlParams.get('sender');
+    const propertyId = urlParams.get('property');
+
+    if (!senderId || !propertyId) {
+        alert('Please select a conversation first.');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('send_message', '1');
+    formData.append('receiver_id', senderId);
+    formData.append('property_id', propertyId);
+    formData.append('message', msg);
+
+    fetch('ajax-messages.php', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const thread = document.getElementById('messageThread');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message-item sent';
+            msgDiv.dataset.msgid = data.msg_id;
+            const now = new Date();
+            const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            msgDiv.innerHTML = `
+                <div class="msg-text">${escapeHtml(msg)}</div>
+                <div class="msg-time">${time}</div>
+                <div class="msg-actions">
+                    <button onclick="editMessage(${data.msg_id}, this)"><i class="fas fa-edit"></i></button>
+                    <button onclick="deleteMessage(${data.msg_id})"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            `;
+            thread.appendChild(msgDiv);
+            document.getElementById('scrollAnchor').scrollIntoView({ behavior: 'smooth' });
+            input.value = '';
+            input.style.height = '44px';
+            updateConversationLastMsg(senderId, propertyId, msg);
+        } else {
+            alert(data.error || 'Failed to send message.');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('An error occurred while sending the message.');
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function updateConversationLastMsg(senderId, propertyId, msg) {
+    const items = document.querySelectorAll('.conversation-item');
+    items.forEach(item => {
+        if (item.dataset.sender == senderId && item.dataset.property == propertyId) {
+            const lastMsg = item.querySelector('.last-msg');
+            if (lastMsg) lastMsg.textContent = msg.substring(0, 60);
+            const time = item.querySelector('.time');
+            if (time) time.textContent = 'Just now';
+        }
+    });
+}
+
+// ===== DELETE CONVERSATION =====
+let deleteTarget = null;
+function deleteConversation(senderId, propertyId) {
+    deleteTarget = { sender: senderId, property: propertyId };
+    document.getElementById('deleteMessage').textContent = 'Are you sure you want to delete this entire conversation? All messages will be permanently removed.';
+    document.getElementById('confirmDeleteBtn').onclick = function() {
+        performDeleteConversation(senderId, propertyId);
+    };
+    document.getElementById('deleteModal').classList.add('active');
+}
+
+function performDeleteConversation(senderId, propertyId) {
+    fetch('ajax-messages.php?delete_conversation=1&sender=' + senderId + '&property=' + propertyId, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remove from list
+            const items = document.querySelectorAll('.conversation-item');
+            items.forEach(item => {
+                if (item.dataset.sender == senderId && item.dataset.property == propertyId) {
+                    item.remove();
+                }
+            });
+            // If no items left, show empty state
+            const list = document.getElementById('convList');
+            if (list.querySelectorAll('.conversation-item').length === 0) {
+                list.innerHTML = `
+                    <div style="padding:40px 20px; text-align:center; color:#94a3b8;">
+                        <i class="fas fa-inbox" style="font-size:32px; display:block; margin-bottom:12px;"></i>
+                        <p>No conversations yet</p>
+                    </div>
+                `;
+            }
+            // Redirect to clear selected conversation
+            window.location.href = 'manage-messages.php';
+        } else {
+            alert(data.error || 'Failed to delete conversation.');
+        }
+        closeDeleteModal();
+    })
+    .catch(err => {
+        console.error(err);
+        alert('An error occurred.');
+        closeDeleteModal();
+    });
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('active');
+    deleteTarget = null;
+}
+
+// ===== DELETE INDIVIDUAL MESSAGE =====
+function deleteMessage(msgId) {
+    if (!confirm('Delete this message?')) return;
+    fetch('ajax-messages.php?delete_message=1&msg_id=' + msgId, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const msgEl = document.querySelector(`.message-item[data-msgid="${msgId}"]`);
+            if (msgEl) msgEl.remove();
+        } else {
+            alert(data.error || 'Failed to delete message.');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('An error occurred.');
+    });
+}
+
+// ===== EDIT MESSAGE =====
+function editMessage(msgId, btn) {
+    const msgItem = btn.closest('.message-item');
+    const msgText = msgItem.querySelector('.msg-text');
+    const currentText = msgText.textContent;
+    const input = document.createElement('textarea');
+    input.value = currentText;
+    input.style.width = '100%';
+    input.style.padding = '8px';
+    input.style.border = '1px solid #0E7A4E';
+    input.style.borderRadius = '8px';
+    input.style.fontSize = '14px';
+    input.style.resize = 'vertical';
+    msgText.innerHTML = '';
+    msgText.appendChild(input);
+
+    const actions = msgItem.querySelector('.msg-actions');
+    actions.innerHTML = `
+        <button onclick="saveEditMessage(${msgId}, this)" style="background:#0E7A4E;color:#fff;"><i class="fas fa-save"></i></button>
+        <button onclick="cancelEditMessage(this)" style="background:#e9ecef;"><i class="fas fa-times"></i></button>
+    `;
+    input.focus();
+}
+
+function saveEditMessage(msgId, btn) {
+    const msgItem = btn.closest('.message-item');
+    const input = msgItem.querySelector('textarea');
+    const newText = input.value.trim();
+    if (!newText) return;
+
+    fetch('ajax-messages.php?edit_message=1&msg_id=' + msgId + '&message=' + encodeURIComponent(newText), {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const msgText = msgItem.querySelector('.msg-text');
+            msgText.textContent = newText;
+            msgItem.querySelector('.msg-actions').innerHTML = `
+                <button onclick="editMessage(${msgId}, this)"><i class="fas fa-edit"></i></button>
+                <button onclick="deleteMessage(${msgId})"><i class="fas fa-trash-alt"></i></button>
+            `;
+        } else {
+            alert(data.error || 'Failed to edit message.');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('An error occurred.');
+    });
+}
+
+function cancelEditMessage(btn) {
+    const msgItem = btn.closest('.message-item');
+    const msgText = msgItem.querySelector('.msg-text');
+    const originalText = msgText.textContent;
+    msgText.textContent = originalText;
+    const msgId = msgItem.dataset.msgid;
+    msgItem.querySelector('.msg-actions').innerHTML = `
+        <button onclick="editMessage(${msgId}, this)"><i class="fas fa-edit"></i></button>
+        <button onclick="deleteMessage(${msgId})"><i class="fas fa-trash-alt"></i></button>
+    `;
+}
+
+document.addEventListener('input', function(e) {
+    if (e.target.id === 'msgInput') {
+        e.target.style.height = '44px';
+        e.target.style.height = e.target.scrollHeight + 'px';
+    }
+});
+
+window.addEventListener('load', function() {
+    const anchor = document.getElementById('scrollAnchor');
+    if (anchor) anchor.scrollIntoView();
 });
 </script>
 

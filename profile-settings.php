@@ -739,6 +739,7 @@ $avatar_path = $profile_pic_path; // use for topbar avatar
             position:absolute;
             right:14px;
             top:50%;
+            flex:1;
             transform:translateY(-50%);
             background:none;
             border:none;
@@ -748,12 +749,20 @@ $avatar_path = $profile_pic_path; // use for topbar avatar
         }
         .password-toggle:hover { color:#0b1a2e; }
 
+.account-zone-card{
+    display:flex;
+    flex-direction:column;
+    height:100%;
+    min-height:420px;   /* Card ki height */
+}
         .account-zone-notice {
             background:#fffbeb;
             border:1px solid #fde68a;
             border-radius:12px;
             padding:14px 16px;
             display:flex;
+                        flex:1;
+
             gap:12px;
             margin-bottom:20px;
         }
@@ -903,7 +912,6 @@ $avatar_path = $profile_pic_path; // use for topbar avatar
             </div>
 
             <div class="topbar-actions">
-                <button class="icon-btn" title="Notifications">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                     <?php if($total_messages > 0): ?>
                         <span class="count"><?php echo $total_messages > 9 ? '9+' : $total_messages; ?></span>
