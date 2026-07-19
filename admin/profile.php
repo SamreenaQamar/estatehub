@@ -20,6 +20,9 @@ $has_pic_column = mysqli_num_rows($result) > 0;
 $result = mysqli_query($conn, "SHOW COLUMNS FROM users LIKE 'bio'");
 $has_bio_column = mysqli_num_rows($result) > 0;
 
+// ------------------------------
+// UPLOAD PROFILE PICTURE
+// ------------------------------
 if (isset($_FILES['profile_pic']) && $_FILES['profile_pic']['error'] == 0 && $_FILES['profile_pic']['size'] > 0) {
     $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
     $filename = $_FILES['profile_pic']['name'];
@@ -27,10 +30,7 @@ if (isset($_FILES['profile_pic']) && $_FILES['profile_pic']['error'] == 0 && $_F
 
     if (in_array($ext, $allowed)) {
         $upload_dir = "../uploads/profiles/";
-
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0777, true);
-        }
+        if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
 
         $new_filename = 'admin_' . $admin_id . '_' . time() . '.' . $ext;
         $target_file = $upload_dir . $new_filename;
@@ -38,9 +38,7 @@ if (isset($_FILES['profile_pic']) && $_FILES['profile_pic']['error'] == 0 && $_F
         $old_files = glob($upload_dir . 'admin_' . $admin_id . '_*');
         if ($old_files) {
             foreach ($old_files as $old_file) {
-                if (file_exists($old_file)) {
-                    unlink($old_file);
-                }
+                if (file_exists($old_file)) unlink($old_file);
             }
         }
 
@@ -62,60 +60,101 @@ if (isset($_FILES['profile_pic']) && $_FILES['profile_pic']['error'] == 0 && $_F
     }
 }
 
+// ------------------------------
+// UPDATE PROFILE (mandatory picture + password)
+// ------------------------------
 if (isset($_POST['update_profile'])) {
-    $full_name = mysqli_real_escape_string($conn, $_POST['full_name']);
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
-    $phone = mysqli_real_escape_string($conn, $_POST['phone']);
-    $bio_text = isset($_POST['bio']) ? mysqli_real_escape_string($conn, $_POST['bio']) : '';
-
-    $sql = "UPDATE users SET full_name = '$full_name', email = '$email', phone = '$phone'";
-
-    if ($has_bio_column) {
-        $sql .= ", bio = '$bio_text'";
+    // Check if profile picture exists (mandatory)
+    $has_pic = false;
+    if ($has_pic_column && !empty($user['profile_pic'])) {
+        $pic_file = "../uploads/profiles/" . $user['profile_pic'];
+        if (file_exists($pic_file)) $has_pic = true;
+    }
+    if (!$has_pic && isset($_SESSION['profile_pic'])) {
+        $pic_file = "../uploads/profiles/" . $_SESSION['profile_pic'];
+        if (file_exists($pic_file)) $has_pic = true;
+    }
+    if (!$has_pic) {
+        $found_files = glob("../uploads/profiles/admin_" . $admin_id . "_*");
+        if (!empty($found_files)) $has_pic = true;
     }
 
-    if (!empty($_POST['new_password'])) {
-        $password = password_hash($_POST['new_password'], PASSWORD_DEFAULT);
-        $sql .= ", password = '$password'";
-    }
-
-    $sql .= " WHERE id = $admin_id";
-
-    if (mysqli_query($conn, $sql)) {
-        $_SESSION['user_name'] = $full_name;
-        $message = "Profile updated successfully!";
-        $messageType = "success";
-
-        $user_query = mysqli_query($conn, "SELECT * FROM users WHERE id = $admin_id");
-        $user = mysqli_fetch_assoc($user_query);
+    if (!$has_pic) {
+        $message = "Profile picture is required. Please upload a photo before saving.";
+        $messageType = "error";
     } else {
-        $message = "Error updating profile. Please try again.";
+        $full_name = mysqli_real_escape_string($conn, $_POST['full_name']);
+        $phone = mysqli_real_escape_string($conn, $_POST['phone']);
+        $city = mysqli_real_escape_string($conn, $_POST['city'] ?? '');
+        $bio_text = isset($_POST['bio']) ? mysqli_real_escape_string($conn, $_POST['bio']) : '';
+
+        $sql = "UPDATE users SET full_name = '$full_name', phone = '$phone', city = '$city'";
+        if ($has_bio_column) {
+            $sql .= ", bio = '$bio_text'";
+        }
+
+        // If new password provided, update it
+        if (!empty($_POST['new_password'])) {
+            $password = password_hash($_POST['new_password'], PASSWORD_DEFAULT);
+            $sql .= ", password = '$password'";
+        }
+
+        $sql .= " WHERE id = $admin_id";
+
+        if (mysqli_query($conn, $sql)) {
+            $_SESSION['user_name'] = $full_name;
+            $message = "Profile updated successfully!";
+            $messageType = "success";
+            $user_query = mysqli_query($conn, "SELECT * FROM users WHERE id = $admin_id");
+            $user = mysqli_fetch_assoc($user_query);
+        } else {
+            $message = "Error updating profile. Please try again.";
+            $messageType = "error";
+        }
+    }
+}
+
+// ------------------------------
+// HANDLE PASSWORD CHANGE
+// ------------------------------
+if (isset($_POST['change_password'])) {
+    $current = $_POST['current_password'] ?? '';
+    $new = $_POST['new_password'] ?? '';
+    $confirm = $_POST['confirm_password'] ?? '';
+
+    if (password_verify($current, $user['password'])) {
+        if ($new == $confirm && strlen($new) >= 6) {
+            $hashed = password_hash($new, PASSWORD_DEFAULT);
+            mysqli_query($conn, "UPDATE users SET password='$hashed' WHERE id=$admin_id");
+            $message = "Password changed successfully!";
+            $messageType = "success";
+        } else {
+            $message = "New password doesn't match or is too short (min 6 characters)!";
+            $messageType = "error";
+        }
+    } else {
+        $message = "Current password is incorrect!";
         $messageType = "error";
     }
 }
 
+// ------------------------------
+// GET PROFILE PICTURE PATH
+// ------------------------------
 $profile_pic_path = '';
-
 if ($has_pic_column && !empty($user['profile_pic'])) {
     $pic_file = "../uploads/profiles/" . $user['profile_pic'];
-    if (file_exists($pic_file)) {
-        $profile_pic_path = $pic_file . '?t=' . time();
-    }
+    if (file_exists($pic_file)) $profile_pic_path = $pic_file . '?t=' . time();
 }
-
 if (empty($profile_pic_path) && isset($_SESSION['profile_pic'])) {
     $pic_file = "../uploads/profiles/" . $_SESSION['profile_pic'];
-    if (file_exists($pic_file)) {
-        $profile_pic_path = $pic_file . '?t=' . time();
-    }
+    if (file_exists($pic_file)) $profile_pic_path = $pic_file . '?t=' . time();
 }
-
 if (empty($profile_pic_path)) {
     $found_files = glob("../uploads/profiles/admin_" . $admin_id . "_*");
     if (!empty($found_files)) {
         $profile_pic_path = $found_files[0] . '?t=' . time();
         $_SESSION['profile_pic'] = basename($found_files[0]);
-
         if ($has_pic_column) {
             $safe_filename = mysqli_real_escape_string($conn, basename($found_files[0]));
             mysqli_query($conn, "UPDATE users SET profile_pic = '$safe_filename' WHERE id = $admin_id");
@@ -123,25 +162,33 @@ if (empty($profile_pic_path)) {
     }
 }
 
+// ------------------------------
+// SIDEBAR STATS
+// ------------------------------
 $stats = [
     'users' => 0,
     'pending' => 0,
     'unread' => 0
 ];
-
 $result = mysqli_query($conn, "SELECT COUNT(*) as total FROM users");
-if ($result && mysqli_num_rows($result) > 0) {
-    $stats['users'] = mysqli_fetch_assoc($result)['total'] ?? 0;
-}
-
+if ($result && mysqli_num_rows($result) > 0) $stats['users'] = mysqli_fetch_assoc($result)['total'] ?? 0;
 $result = mysqli_query($conn, "SELECT COUNT(*) as total FROM properties WHERE status = 'Pending'");
-if ($result && mysqli_num_rows($result) > 0) {
-    $stats['pending'] = mysqli_fetch_assoc($result)['total'] ?? 0;
-}
-
+if ($result && mysqli_num_rows($result) > 0) $stats['pending'] = mysqli_fetch_assoc($result)['total'] ?? 0;
 $result = mysqli_query($conn, "SELECT COUNT(*) as total FROM messages WHERE is_read = 0");
-if ($result && mysqli_num_rows($result) > 0) {
-    $stats['unread'] = mysqli_fetch_assoc($result)['total'] ?? 0;
+if ($result && mysqli_num_rows($result) > 0) $stats['unread'] = mysqli_fetch_assoc($result)['total'] ?? 0;
+
+// ------------------------------
+// EXTRA STATS FOR PROFILE CARD
+// ------------------------------
+$my_properties_count = 0;
+$res = mysqli_query($conn, "SELECT COUNT(*) as total FROM properties WHERE user_id = $admin_id");
+if ($res && mysqli_num_rows($res) > 0) $my_properties_count = mysqli_fetch_assoc($res)['total'] ?? 0;
+
+$total_views = 0;
+$res = mysqli_query($conn, "SHOW COLUMNS FROM properties LIKE 'views'");
+if ($res && mysqli_num_rows($res) > 0) {
+    $res2 = mysqli_query($conn, "SELECT SUM(views) as total FROM properties WHERE user_id = $admin_id");
+    if ($res2 && mysqli_num_rows($res2) > 0) $total_views = mysqli_fetch_assoc($res2)['total'] ?? 0;
 }
 
 $page_title = 'My Profile';
@@ -156,13 +203,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
-        /* ===== ALL EXISTING STYLES REMAIN UNCHANGED ===== */
         :root {
             --bg: #f1f5f9;
             --sidebar-bg: #0f172a;
             --sidebar-hover: #1e293b;
-            --blue: #16A366;
-            --green: #10b981;
+            --blue: #0E7A4E; /* Updated to EstateHub brand */
+            --green: #0E7A4E;
             --amber: #f59e0b;
             --purple: #8b5cf6;
             --red: #ef4444;
@@ -178,20 +224,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
             --transition: all 0.25s ease;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin:0; padding:0; box-sizing:border-box; }
         body {
             font-family: 'Inter', sans-serif;
             background: var(--bg);
             display: flex;
             min-height: 100vh;
+            overflow-y: auto;
         }
 
-        /* ===== SIDEBAR - EXACTLY LIKE OTHER ADMIN FILES ===== */
+        /* ===== SIDEBAR - EstateHub Theme ===== */
         .sidebar {
             width: 280px;
             min-width: 280px;
@@ -209,6 +251,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
             box-shadow: 4px 0 40px rgba(0, 0, 0, 0.15);
             overflow-y: auto;
             padding: 24px 16px;
+            transition: transform 0.25s ease;
+        }
+        .sidebar.sidebar-hidden {
+            transform: translateX(-100%);
         }
 
         .logo {
@@ -372,11 +418,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
             color: #64748b;
         }
 
-        /* ===== REST OF THE STYLES (UNCHANGED) ===== */
+        /* ===== MAIN CONTENT ===== */
         .main-content {
             margin-left: 280px;
             flex: 1;
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
         }
 
         .topbar {
@@ -384,231 +433,158 @@ $current_page = basename($_SERVER['PHP_SELF']);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
-            padding: 20px 36px;
-            position: sticky;
-            top: 0;
-            z-index: 50;
+            padding: 16px 32px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .topbar-hamburger {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .topbar-hamburger:hover {
+            background: #f1f5f9;
         }
 
         .topbar h1 {
-            font-size: 28px;
+            font-size: 22px;
             font-weight: 800;
             color: var(--text-primary);
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .topbar-icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 17px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        .topbar-icon-btn:hover {
+            background: #f1f5f9;
+            color: var(--text-primary);
+        }
+        .topbar-icon-btn .badge-count {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: var(--red);
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+            min-width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #ffffff;
+        }
+        .topbar-icon-btn .badge-count.green {
+            background: var(--blue);
+        }
+
+        .topbar-divider {
+            width: 1px;
+            height: 26px;
+            background: var(--border);
+            margin: 0 4px;
         }
 
         .topbar-profile-pic {
             width: 42px;
             height: 42px;
-            border-radius: var(--radius-md);
-            background: linear-gradient(135deg, var(--blue), var(--purple));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 18px;
-            overflow: hidden;
-            cursor: pointer;
-            border: 2px solid var(--border);
-        }
-
-        .topbar-profile-pic img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .content-area {
-            padding: 36px;
-            max-width: 800px;
-        }
-
-        .profile-header-card {
-            background: var(--card-bg);
-            border-radius: var(--radius-2xl);
-            padding: 40px;
-            border: 1px solid var(--border);
-            text-align: center;
-            margin-bottom: 24px;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .profile-avatar-lg {
-            width: 130px;
-            height: 130px;
             border-radius: 50%;
             background: linear-gradient(135deg, var(--amber), var(--red));
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 50px;
             color: white;
-            margin: 0 auto 20px;
-            cursor: pointer;
-            position: relative;
+            font-size: 16px;
             overflow: hidden;
-            box-shadow: 0 10px 40px rgba(245, 158, 11, 0.3);
-            transition: var(--transition);
+            cursor: pointer;
+            border: 2px solid var(--border);
+            flex-shrink: 0;
         }
-
-        .profile-avatar-lg:hover {
-            transform: scale(1.05);
-        }
-
-        .profile-avatar-lg img {
+        .topbar-profile-pic img {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
-
-        .profile-avatar-lg .overlay {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 8px;
-            font-size: 10px;
-            color: white;
-            opacity: 0;
-            transition: var(--transition);
-        }
-
-        .profile-avatar-lg:hover .overlay {
-            opacity: 1;
-        }
-
-        .profile-header-card h2 {
-            font-size: 26px;
-            font-weight: 800;
-            color: var(--text-primary);
-        }
-
-        .profile-header-card .email-text {
-            font-size: 14px;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-
-        .profile-header-card .badge-admin {
-            display: inline-block;
-            background: linear-gradient(135deg, var(--amber), var(--red));
-            color: white;
-            padding: 6px 16px;
-            border-radius: 50px;
-            font-size: 12px;
-            font-weight: 700;
-            margin-top: 12px;
-        }
-
-        .profile-form-card {
-            background: var(--card-bg);
-            border-radius: var(--radius-2xl);
-            padding: 36px;
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow-sm);
-        }
-
-        .profile-form-card h2 {
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 24px;
+        .topbar-admin-chip {
             display: flex;
             align-items: center;
             gap: 10px;
+            cursor: pointer;
+            padding: 4px 8px 4px 4px;
+            border-radius: 50px;
+            transition: var(--transition);
         }
-
-        .profile-form-card h2 i {
-            color: var(--blue);
+        .topbar-admin-chip:hover {
+            background: #f1f5f9;
         }
-
-        .form-group {
-            margin-bottom: 22px;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 11px;
+        .topbar-admin-chip .who h4 {
+            font-size: 13.5px;
             font-weight: 700;
             color: var(--text-primary);
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            margin-bottom: 10px;
+            line-height: 1.3;
+        }
+        .topbar-admin-chip .who span {
+            font-size: 11.5px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .topbar-admin-chip .fa-chevron-down {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-left: 2px;
         }
 
-        .form-group input,
-        .form-group textarea {
+        /* ===== CONTENT AREA ===== */
+        .content-area {
+            flex: 1;
+            padding: 24px 32px;
             width: 100%;
-            padding: 14px 18px;
-            border: 2px solid var(--border);
-            border-radius: 14px;
-            font-size: 15px;
-            font-family: 'Inter', sans-serif;
-            transition: var(--transition);
-            background: #f8fafc;
-            color: var(--text-primary);
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: var(--blue);
-            background: white;
-            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 18px;
-        }
-
-        .btn {
-            padding: 14px 32px;
-            border-radius: 50px;
-            font-size: 15px;
-            font-weight: 600;
-            border: none;
-            cursor: pointer;
-            transition: var(--transition);
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            font-family: 'Inter', sans-serif;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--blue), #0e7a4e);
-            color: white;
-            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
-        }
-
-        .btn-outline {
-            background: #f1f5f9;
-            color: var(--text-secondary);
-            border-radius: var(--radius-md);
-            padding: 10px 20px;
-            font-size: 13px;
-            border: none;
-        }
-
-        .btn-outline:hover {
-            background: #e2e8f0;
+            overflow-y: auto;
         }
 
         .alert {
-            padding: 16px 24px;
-            border-radius: 16px;
-            margin-bottom: 24px;
+            padding: 14px 20px;
+            border-radius: 14px;
+            margin-bottom: 16px;
             font-size: 14px;
             font-weight: 600;
             display: flex;
@@ -616,25 +592,518 @@ $current_page = basename($_SERVER['PHP_SELF']);
             gap: 10px;
             transition: opacity 0.5s, transform 0.5s;
         }
-
         .alert-success {
             background: #ecfdf5;
             color: #065f46;
             border: 1px solid #a7f3d0;
         }
-
         .alert-error {
             background: #fef2f2;
             color: #991b1b;
             border: 1px solid #fecaca;
         }
-
         .alert-warning {
             background: #fffbeb;
             color: #92400e;
             border: 1px solid #fde68a;
         }
 
+        /* ===== PROFILE PAGE LAYOUT (matches reference) ===== */
+        .profile-page-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        /* --- LEFT PROFILE CARD --- */
+        .profile-side-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-2xl);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+        }
+        .profile-side-banner {
+            height: 110px;
+            background: linear-gradient(135deg, #0E7A4E, #16a34a);
+            position: relative;
+        }
+        .profile-side-avatar-wrap {
+            display: flex;
+            justify-content: center;
+            margin-top: -65px;
+            position: relative;
+        }
+        .profile-side-avatar {
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            border: 5px solid #ffffff;
+            background: linear-gradient(135deg, var(--amber), var(--red));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 46px;
+            color: white;
+            overflow: hidden;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            position: relative;
+        }
+        .profile-side-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .avatar-cam-btn {
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            width: 34px;
+            height: 34px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--blue);
+            font-size: 14px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            cursor: pointer;
+            border: 1px solid var(--border);
+            transition: var(--transition);
+        }
+        .avatar-cam-btn:hover {
+            background: var(--blue);
+            color: white;
+            transform: scale(1.08);
+        }
+
+        .profile-side-body {
+            text-align: center;
+            padding: 12px 24px 24px;
+        }
+        .profile-side-body h2 {
+            font-size: 19px;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-top: 4px;
+        }
+        .verified-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #ecfdf5;
+            color: #059669;
+            padding: 4px 14px;
+            border-radius: 50px;
+            font-size: 12px;
+            font-weight: 700;
+            margin: 8px 0 16px;
+        }
+
+        .profile-side-contact {
+            text-align: left;
+            padding-top: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .profile-side-contact div {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .profile-side-contact i {
+            color: var(--text-muted);
+            width: 16px;
+            text-align: center;
+        }
+
+        .profile-side-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            padding: 20px 24px 12px;
+            border-top: 1px solid var(--border);
+            margin-top: 8px;
+        }
+        .profile-side-stats .stat-box {
+            background: transparent;
+            border-radius: 14px;
+            padding: 6px 8px;
+            text-align: center;
+        }
+        .profile-side-stats .stat-box i {
+            color: var(--text-secondary);
+            font-size: 17px;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .profile-side-stats .stat-box.views i {
+            color: var(--blue);
+        }
+        .profile-side-stats .stat-box .num {
+            font-size: 19px;
+            font-weight: 800;
+            color: var(--text-primary);
+            display: block;
+        }
+        .profile-side-stats .stat-box .lbl {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .profile-side-completion {
+            padding: 4px 24px 20px;
+        }
+        .profile-side-completion .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .profile-side-completion .row span:first-child {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .profile-side-completion .row span:last-child {
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--blue);
+        }
+        .completion-bar {
+            height: 7px;
+            background: var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .completion-bar .fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--blue), #34d399);
+            border-radius: 10px;
+            transition: width 0.6s ease;
+        }
+
+        .change-photo-btn {
+            margin: 4px 24px 24px;
+            width: calc(100% - 48px);
+            padding: 11px;
+            border-radius: 12px;
+            border: 2px solid var(--border);
+            background: white;
+            color: var(--blue);
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .change-photo-btn:hover {
+            background: #ecfdf5;
+            border-color: var(--blue);
+        }
+/* ===== RIGHT COLUMN ===== */
+
+.profile-right-col{
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+}
+
+/* Change Password + Account Zone Row */
+.bottom-settings-row{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:24px;
+    width:100%;
+    align-items:start;
+}
+
+.bottom-settings-row{
+    display:grid;
+    grid-template-columns:6fr 0.9fr;
+    gap:20px;
+}
+
+/* Main Cards */
+.settings-card{
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:20px;
+    padding:28px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.05);
+    transition:all .3s ease;
+}
+
+.settings-card:hover{
+    box-shadow:0 10px 30px rgba(0,0,0,0.08);
+}
+
+/* Card Header */
+.settings-card .card-header{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding-bottom:18px;
+    margin-bottom:20px;
+    border-bottom:1px solid #eef2f7;
+}
+
+.settings-card .card-header .icon{
+    width:42px;
+    height:42px;
+    border-radius:12px;
+    background:#ecfdf5;
+    color:#0E7A4E;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:16px;
+    flex-shrink:0;
+}
+
+.settings-card .card-header.icon-danger .icon{
+    background:#fef2f2;
+    color:#ef4444;
+}
+
+.settings-card .card-header h2{
+    font-size:20px;
+    font-weight:700;
+    color:var(--text-primary);
+    margin:0;
+}
+
+.settings-card .card-desc{
+    font-size:14px;
+    color:var(--text-muted);
+    margin-bottom:20px;
+}
+
+/* Forms */
+.form-group{
+    margin-bottom:18px;
+}
+
+.form-group label{
+    display:block;
+    font-size:13px;
+    font-weight:600;
+    color:var(--text-secondary);
+    margin-bottom:8px;
+}
+
+.form-group input,
+.form-group textarea{
+    width:100%;
+    height:50px;
+    padding:0 16px;
+    border:1.5px solid #dbe2ea;
+    border-radius:12px;
+    font-size:14px;
+    background:#fff;
+    transition:.3s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus{
+    outline:none;
+    border-color:#0E7A4E;
+    box-shadow:0 0 0 4px rgba(14,122,78,.10);
+}
+@media (max-width: 991px){
+
+    .profile-page-grid{
+        grid-template-columns:1fr;
+    }
+
+    .bottom-settings-row{
+    display:grid;
+    grid-template-columns:2fr 0.8fr;
+    gap:24px;
+}
+}
+
+        .password-field {
+            position: relative;
+        }
+        .password-field input {
+            padding-right: 44px;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 15px;
+            padding: 4px;
+        }
+        .password-toggle:hover {
+            color: var(--text-secondary);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .email-display {
+            padding: 11px 16px;
+            background: #f1f5f9;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .btn {
+            padding: 12px 26px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-family: 'Inter', sans-serif;
+        }
+        .btn-primary{
+    background: linear-gradient(135deg, #0E7A4E, #16a34a);
+    color:#fff;
+    border:none;
+    padding:10px 18px;
+    font-size:13px;
+    font-weight:600;
+    border-radius:10px;
+    box-shadow:0 4px 12px rgba(14,122,78,.25);
+}
+
+.btn-primary:hover{
+    background: linear-gradient(135deg, #0a5c3a, #0E7A4E);
+    transform:translateY(-2px);
+    box-shadow:0 8px 18px rgba(14,122,78,.35);
+}
+
+/* Update Password button ko chhota karo */
+.btn-block{
+    width:auto;
+    min-width:170px;
+}
+
+        /* ===== ACCOUNT ZONE ===== */
+
+.account-zone-notice{
+    background:#fffaf0;
+    border:1px solid #fde68a;
+    border-radius:14px;
+    padding:14px 16px;
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    margin-bottom:24px;
+}
+
+.account-zone-notice i{
+    color:#f59e0b;
+    font-size:16px;
+    margin-top:2px;
+}
+
+.account-zone-notice h4{
+    font-size:13px;
+    font-weight:700;
+    color:#92400e;
+    margin:0 0 4px;
+}
+
+.account-zone-notice p{
+    font-size:12px;
+    color:#92400e;
+    line-height:1.5;
+    margin:0;
+}
+
+/* Buttons */
+
+.zone-btn{
+    width:220px;               /* Full width remove */
+    height:42px;
+    margin:0 auto 12px;        /* Center */
+    border-radius:10px;
+    font-size:13px;
+    font-weight:600;
+    border:1.5px solid var(--border);
+    background:#fff;
+    color:var(--text-secondary);
+    cursor:pointer;
+    transition:all .3s ease;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    text-decoration:none;
+}
+
+.zone-btn:hover{
+    transform:translateY(-2px);
+}
+
+/* Logout */
+
+.logout-zone-btn{
+    color:#ef4444;
+    border-color:#fecaca;
+    margin-top:40px; /* Neeche le jao */
+}
+
+.logout-zone-btn:hover{
+    background:#fef2f2;
+    border-color:#ef4444;
+}
+
+/* Delete */
+
+.delete-zone-btn{
+    background:#ef4444;
+    color:#fff;
+    border-color:#ef4444;
+    margin-bottom:0;
+}
+
+.delete-zone-btn:hover{
+    background:#dc2626;
+    border-color:#dc2626;
+}
+
+/* Footer */
+
+.page-footer{
+    text-align:center;
+    font-size:12px;
+    color:var(--text-muted);
+    padding:24px 0 4px;
+}
         @media (max-width: 1024px) {
             .sidebar {
                 display: none;
@@ -642,8 +1111,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
             .main-content {
                 margin-left: 0;
             }
+            .profile-page-grid {
+                grid-template-columns: 1fr;
+            }
         }
-
         @media (max-width: 768px) {
             .form-row {
                 grid-template-columns: 1fr;
@@ -651,12 +1122,18 @@ $current_page = basename($_SERVER['PHP_SELF']);
             .content-area {
                 padding: 16px;
             }
+            .settings-card {
+                padding: 20px;
+            }
+            .topbar {
+                padding: 12px 16px;
+            }
         }
     </style>
 </head>
 <body>
 
-<!-- ===== SIDEBAR - REPLACED WITH EXACT SAME AS OTHER ADMIN FILES ===== -->
+<!-- ===== SIDEBAR - EstateHub Theme ===== -->
 <aside class="sidebar">
     <div class="logo">
         <a href="../index.php">
@@ -772,17 +1249,39 @@ $current_page = basename($_SERVER['PHP_SELF']);
     </div>
 </aside>
 
-<!-- ===== MAIN CONTENT - UNCHANGED ===== -->
+<!-- ===== MAIN CONTENT ===== -->
 <main class="main-content">
     <header class="topbar">
-        <h1>My Profile</h1>
-        <div class="topbar-profile-pic" onclick="window.location.href='profile.php'">
-            <?php if (!empty($profile_pic_path)): ?>
-                <img src="<?php echo $profile_pic_path; ?>" alt="Admin" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                <i class="fas fa-user-shield" style="display:none;"></i>
-            <?php else: ?>
-                <i class="fas fa-user-shield"></i>
-            <?php endif; ?>
+        <div class="topbar-left">
+            <button type="button" class="topbar-hamburger" onclick="document.querySelector('.sidebar').classList.toggle('sidebar-hidden')">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h1>Profile Settings</h1>
+        </div>
+        <div class="topbar-right">
+            <!-- Notification bell only (Messages icon removed) -->
+            <a href="manage-messages.php" class="topbar-icon-btn" title="Notifications">
+                <i class="fas fa-bell"></i>
+                <?php if ($stats['unread'] > 0): ?>
+                    <span class="badge-count"><?php echo $stats['unread'] > 9 ? '9+' : $stats['unread']; ?></span>
+                <?php endif; ?>
+            </a>
+            <div class="topbar-divider"></div>
+            <div class="topbar-admin-chip" onclick="window.location.href='profile.php'">
+                <div class="topbar-profile-pic">
+                    <?php if (!empty($profile_pic_path)): ?>
+                        <img src="<?php echo $profile_pic_path; ?>" alt="Admin" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                        <i class="fas fa-user-shield" style="display:none;"></i>
+                    <?php else: ?>
+                        <i class="fas fa-user-shield"></i>
+                    <?php endif; ?>
+                </div>
+                <div class="who">
+                    <h4><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'Admin'); ?></h4>
+                    <span>Admin</span> <!-- Changed from Seller -->
+                </div>
+                <i class="fas fa-chevron-down"></i>
+            </div>
         </div>
     </header>
 
@@ -801,65 +1300,173 @@ $current_page = basename($_SERVER['PHP_SELF']);
             </div>
         <?php endif; ?>
 
-        <div class="profile-header-card">
-            <div class="profile-avatar-lg" onclick="document.getElementById('picInput').click()" title="Click to change photo">
-                <?php if (!empty($profile_pic_path)): ?>
-                    <img src="<?php echo $profile_pic_path; ?>" alt="Profile" id="profilePreview" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                    <i class="fas fa-crown" style="display:none;"></i>
-                <?php else: ?>
-                    <i class="fas fa-crown"></i>
-                <?php endif; ?>
-                <div class="overlay">Change Photo</div>
+        <!-- Hidden shared upload form -->
+        <form method="POST" enctype="multipart/form-data" id="picForm" style="display: none;">
+            <input type="file" id="picInput" name="profile_pic" accept="image/*" onchange="this.form.submit()">
+        </form>
+
+        <div class="profile-page-grid">
+
+            <!-- ===== LEFT PROFILE CARD ===== -->
+            <div class="profile-side-card">
+                <div class="profile-side-banner"></div>
+                <div class="profile-side-avatar-wrap">
+                    <div class="profile-side-avatar" onclick="document.getElementById('picInput').click()" title="Click to change photo">
+                        <?php if (!empty($profile_pic_path)): ?>
+                            <img src="<?php echo $profile_pic_path; ?>" alt="Profile" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                            <i class="fas fa-crown" style="display:none;"></i>
+                        <?php else: ?>
+                            <i class="fas fa-crown"></i>
+                        <?php endif; ?>
+                    </div>
+                    <div class="avatar-cam-btn" onclick="document.getElementById('picInput').click()">
+                        <i class="fas fa-camera"></i>
+                    </div>
+                </div>
+
+                <div class="profile-side-body">
+                    <h2><?php echo htmlspecialchars($user['full_name'] ?? $_SESSION['user_name'] ?? 'Admin'); ?></h2>
+                    <div class="verified-badge"><i class="fas fa-check-circle"></i> Admin</div> <!-- Changed from Verified Seller -->
+
+                    <div class="profile-side-contact">
+                        <div><i class="fas fa-envelope"></i> <?php echo htmlspecialchars($user['email'] ?? ''); ?></div>
+                        <div><i class="fas fa-phone"></i> <?php echo htmlspecialchars($user['phone'] ?? '+92 300 1234567'); ?></div>
+                    </div>
+                </div>
+
+                <div class="profile-side-stats">
+                    <div class="stat-box">
+                        <i class="fas fa-home"></i>
+                        <span class="num"><?php echo (int)$my_properties_count; ?></span>
+                        <span class="lbl">Properties</span>
+                    </div>
+                    <div class="stat-box views">
+                        <i class="fas fa-eye"></i>
+                        <span class="num"><?php echo number_format((float)$total_views / 1000, 1); ?>K</span>
+                        <span class="lbl">Total Views</span>
+                    </div>
+                </div>
+
+                <div class="profile-side-completion">
+                    <div class="row">
+                        <span>Profile Completion</span>
+                        <span>85%</span>
+                    </div>
+                    <div class="completion-bar">
+                        <div class="fill" style="width: 85%;"></div>
+                    </div>
+                </div>
+
+                <button type="button" class="change-photo-btn" onclick="document.getElementById('picInput').click()">
+                    <i class="fas fa-camera"></i> Change Photo
+                </button>
             </div>
-            <form method="POST" enctype="multipart/form-data" id="picForm" style="display: none;">
-                <input type="file" id="picInput" name="profile_pic" accept="image/*" onchange="this.form.submit()">
-            </form>
-            <h2><?php echo htmlspecialchars($user['full_name'] ?? $_SESSION['user_name'] ?? 'Admin'); ?></h2>
-            <p class="email-text"><?php echo htmlspecialchars($user['email'] ?? 'admin@estatehub.com'); ?></p>
-            <span class="badge-admin"><i class="fas fa-shield-alt"></i> Super Admin</span>
+
+            <!-- ===== RIGHT COLUMN ===== -->
+            <div class="profile-right-col">
+
+                <!-- Personal Information -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <span class="icon"><i class="fas fa-user"></i></span>
+                        <h2>Personal Information</h2>
+                    </div>
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Full Name</label>
+                                <input type="text" name="full_name" value="<?php echo htmlspecialchars($user['full_name'] ?? ''); ?>" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Email Address</label>
+                                <div class="email-display"><?php echo htmlspecialchars($user['email'] ?? ''); ?></div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Phone Number</label>
+                                <input type="text" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? '+92 300 1234567'); ?>">
+                            </div>
+                            <div class="form-group">
+                                <label>City</label>
+                                <input type="text" name="city" value="<?php echo htmlspecialchars($user['city'] ?? 'Lahore'); ?>">
+                            </div>
+                        </div>
+                        <?php if ($has_bio_column): ?>
+                            <div class="form-group">
+                                <label>Bio (Optional)</label>
+                                <input type="text" name="bio" value="<?php echo htmlspecialchars($user['bio'] ?? ''); ?>" placeholder="Short bio or extra note">
+                            </div>
+                        <?php endif; ?>
+                        <button type="submit" name="update_profile" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Changes
+                        </button>
+                    </form>
+                </div>
+<div class="bottom-settings-row">
+
+                <!-- Change Password -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <span class="icon"><i class="fas fa-lock"></i></span>
+                        <h2>Change Password</h2>
+                    </div>
+                    <form method="POST">
+                        <div class="form-group">
+                            <label>Current Password</label>
+                            <div class="password-field">
+                                <input type="password" name="current_password" placeholder="Enter current password" required>
+                                <button type="button" class="password-toggle" onclick="togglePw(this)"><i class="fas fa-eye"></i></button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>New Password</label>
+                            <div class="password-field">
+                                <input type="password" name="new_password" placeholder="Enter new password" required>
+                                <button type="button" class="password-toggle" onclick="togglePw(this)"><i class="fas fa-eye"></i></button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Confirm Password</label>
+                            <div class="password-field">
+                                <input type="password" name="confirm_password" placeholder="Confirm new password" required>
+                                <button type="button" class="password-toggle" onclick="togglePw(this)"><i class="fas fa-eye"></i></button>
+                            </div>
+                        </div>
+                        <button type="submit" name="change_password" class="btn btn-primary btn-block">
+                            <i class="fas fa-lock"></i> Update Password
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Account Zone -->
+                <div class="settings-card">
+                    <div class="card-header icon-danger">
+                        <span class="icon"><i class="fas fa-triangle-exclamation"></i></span>
+                        <h2>Account Zone</h2>
+                    </div>
+                    <p class="card-desc">Manage your account actions.</p>
+
+                    <div class="account-zone-notice">
+                        <i class="fas fa-shield-halved"></i>
+                        <div>
+                            <h4>Delete your account permanently.</h4>
+                            <p>All your data, properties and messages will be removed.</p>
+                        </div>
+                    </div>
+
+                    <a href="../logout.php" class="zone-btn logout-zone-btn">
+                        <i class="fas fa-right-from-bracket"></i> Logout
+                    </a>
+                    <button type="button" class="zone-btn delete-zone-btn" onclick="if(confirm('Are you sure you want to delete your account? This cannot be undone.')){ alert('Account deletion coming soon!'); }">
+                        <i class="fas fa-trash"></i> Delete Account
+                    </button>
+                </div>
+
+            </div>
         </div>
 
-        <div class="profile-form-card">
-            <h2><i class="fas fa-user-edit"></i> Edit Profile Information</h2>
-            <form method="POST" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label>Profile Picture</label>
-                    <button type="button" class="btn btn-outline" onclick="document.getElementById('picInput2').click()">
-                        <i class="fas fa-camera"></i> Choose Photo
-                    </button>
-                    <input type="file" id="picInput2" name="profile_pic" accept="image/*" style="display: none;" onchange="this.form.submit()">
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Full Name</label>
-                        <input type="text" name="full_name" value="<?php echo htmlspecialchars($user['full_name'] ?? ''); ?>" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" name="email" value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>" required>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Phone</label>
-                        <input type="text" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? '+92 300 1234567'); ?>">
-                    </div>
-                    <div class="form-group">
-                        <label>New Password (optional)</label>
-                        <input type="password" name="new_password" placeholder="Leave blank to keep current">
-                    </div>
-                </div>
-                <?php if ($has_bio_column): ?>
-                    <div class="form-group">
-                        <label>Bio</label>
-                        <textarea name="bio" rows="3" placeholder="Tell us about yourself..."><?php echo htmlspecialchars($user['bio'] ?? ''); ?></textarea>
-                    </div>
-                <?php endif; ?>
-                <button type="submit" name="update_profile" class="btn btn-primary">
-                    <i class="fas fa-save"></i> Update Profile
-                </button>
-            </form>
-        </div>
+        <div class="page-footer">© <?php echo date('Y'); ?> EstateHub. All rights reserved.</div>
     </div>
 </main>
 
@@ -878,6 +1485,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 4000);
     });
 });
+
+function togglePw(btn) {
+    var input = btn.previousElementSibling;
+    var icon = btn.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
 </script>
 
 </body>
