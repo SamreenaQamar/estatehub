@@ -494,6 +494,30 @@ SELECT
     (SELECT COUNT(*) FROM wishlist) as total_wishlist_items,
     (SELECT COUNT(*) FROM messages) as total_messages;
 
+    -- =========================================================
+-- EstateHub — optional schema updates for User Management
+-- Run only the statements you need. Nothing here deletes data.
+-- =========================================================
+
+-- 1) Add "city" and "last_login" columns if you don't already have them.
+--    The admin page works fine without these (fields just show
+--    "Not provided" / "Never logged in"), so this step is optional.
+ALTER TABLE users ADD COLUMN city VARCHAR(100) NULL AFTER phone;
+ALTER TABLE users ADD COLUMN last_login DATETIME NULL AFTER city;
+
+-- 2) If your "status" column is a MySQL ENUM (not VARCHAR), you must
+--    widen it to allow the new 'deleted' value. Skip this if status
+--    is already VARCHAR — no change needed in that case.
+ALTER TABLE users MODIFY status ENUM('active','pending','blocked','deleted') NOT NULL DEFAULT 'pending';
+
+-- 3) If your "user_type" column is ENUM('admin','seller','user'), no
+--    change is required — the app already uses these exact 3 values
+--    ('user' is displayed as "Buyer" in the interface).
+
+-- 4) Recommended index to keep search fast as your users table grows.
+ALTER TABLE users ADD INDEX idx_status (status);
+ALTER TABLE users ADD INDEX idx_user_type (user_type);
+
 -- =============================================
 -- END OF DATABASE SQL FILE
 -- =============================================
