@@ -837,12 +837,12 @@ $completion = round(($filled / count($fields)) * 100);
                     
                     <form method="POST">
                         <div class="form-group">
-                            <label><i class="fas fa-user"></i> Full Name</label>
-                            <input type="text" name="full_name" value="<?php echo htmlspecialchars($user['full_name']); ?>" required>
+                            <label t><i class="fas fa-user"></i> Enter Seller Name</label>
+                            <input type="text" name="full_name" value="<?php echo htmlspecialchars($user['full_name']); ?>" placeholder="Enter you name" required disabled>
                         </div>
                         <div class="form-group">
-                            <label><i class="fas fa-phone"></i> Phone Number</label>
-                            <input type="tel" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" placeholder="+92 300 1234567">
+                            <label><i class="fas fa-phone"></i> Contact Number</label>
+                            <input type="password" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" placeholder="Enter your Mobile Number" disabled>
                         </div>
                         <div class="form-group">
                             <label><i class="fas fa-envelope"></i> Email Address</label>
@@ -850,7 +850,7 @@ $completion = round(($filled / count($fields)) * 100);
                         </div>
                         <div class="form-group">
                             <label><i class="fas fa-info-circle"></i> Bio / About</label>
-                            <input type="text" name="bio" value="<?php echo htmlspecialchars($user['bio'] ?? ''); ?>" placeholder="Real estate agent...">
+                            <input type="text" name="bio" value="<?php echo htmlspecialchars($user['bio'] ?? ''); ?>" placeholder="Enter About Your">
                         </div>
                         <button type="submit" name="update_profile" class="btn btn-primary btn-sm">
                             <i class="fas fa-save"></i> Save Changes
