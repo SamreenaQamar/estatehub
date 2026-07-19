@@ -787,14 +787,14 @@ $avatar_path = $profile_pic_path; // use for topbar avatar
             display:flex;
             align-items:center;
             justify-content:center;
-            gap:8px;
+            gap:4px;
             text-decoration:none;
         }
         .zone-btn:hover { transform:translateY(-2px); }
         .logout-zone-btn {
             color:#ef4444;
             border-color:#fecaca;
-            margin-bottom:12px;
+            margin-bottom:9px;
         }
         .logout-zone-btn:hover { background:#fef2f2; border-color:#ef4444; }
         .delete-zone-btn {
