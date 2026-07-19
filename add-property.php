@@ -42,8 +42,8 @@ unset($_SESSION['error'], $_SESSION['success']);
             <input type="hidden" name="add_property" value="1">
 
             <div class="form-group full">
-                <label>Property Title</label>
-                <input type="text" name="title" placeholder="e.g. Modern 10 Marla House" required>
+                <label>Enter Property Title </label>
+                <input type="text" name="title" placeholder="Modern 10 Marla House" required>
             </div>
 
             <div class="form-row">
@@ -51,16 +51,22 @@ unset($_SESSION['error'], $_SESSION['success']);
                     <label>Property Type</label>
                     <select name="property_type" required>
                         <?php foreach ($property_types as $pt): ?>
+                            <form>
+                            <option value="">Choose Type</option>
                             <option value="<?php echo htmlspecialchars($pt); ?>"><?php echo htmlspecialchars($pt); ?></option>
-                        <?php endforeach; ?>
+                        </form>
+                            <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Purpose</label>
                     <select name="purpose" required>
                         <?php foreach ($purposes as $pur): ?>
+                            <form action="">
+                                <option value="">Select Purpose</option>
                             <option value="<?php echo htmlspecialchars($pur); ?>"><?php echo $pur == 'Rent' ? 'For Rent' : 'For Sale'; ?></option>
                         <?php endforeach; ?>
+                        </form>
                     </select>
                 </div>
             </div>
@@ -105,6 +111,7 @@ unset($_SESSION['error'], $_SESSION['success']);
     <div class="form-group">
         <label>City</label>
         <select name="city" required>
+            <form action="">
             <option value="">Select City</option>
             <option value="Lahore">Lahore</option>
             <option value="Karachi">Karachi</option>
@@ -135,13 +142,14 @@ unset($_SESSION['error'], $_SESSION['success']);
             <option value="Dera Ismail Khan">Dera Ismail Khan</option>
             <option value="Turbat">Turbat</option>
             <option value="Khuzdar">Khuzdar</option>
+        </form>
         </select>
     </div>
 
     <div class="form-group">
         <label>Location / Area</label>
         <select name="location" required>
-            <option value="">Select Location</option>
+            <option value="">Select Area</option>
             <option value="DHA">DHA</option>
             <option value="Bahria Town">Bahria Town</option>
             <option value="Gulberg">Gulberg</option>
@@ -199,19 +207,21 @@ unset($_SESSION['error'], $_SESSION['success']);
     <div class="form-group">
         <label>Bedrooms</label>
         <select name="bedrooms">
-            <option value="0">Studio</option>
-            <option value="1">1 Bedroom</option>
-            <option value="2">2 Bedrooms</option>
-            <option value="3">3 Bedrooms</option>
-            <option value="4">4 Bedrooms</option>
-            <option value="5">5 Bedrooms</option>
-            <option value="6">6+ Bedrooms</option>
+            <option value="">Select Bed-rooms</option>
+            <option value="0">Studio Rooms</option>
+            <option value="1">1 Bed-room</option>
+            <option value="2">2 Bed-rooms</option>
+            <option value="3">3 Bed-rooms</option>
+            <option value="4">4 Bed-rooms</option>
+            <option value="5">5 Bed-rooms</option>
+            <option value="6">6+ Bed-rooms</option>
         </select>
     </div>
 
     <div class="form-group">
-        <label>Bathrooms</label>
+        <label>Bath-Room</label>
         <select name="bathrooms">
+            <option value="">Choose Bath-Room</option>
             <option value="1">1 Bathroom</option>
             <option value="2">2 Bathrooms</option>
             <option value="3">3 Bathrooms</option>
@@ -353,19 +363,21 @@ input[type=file]{
     line-height:1.5;
 }
 
-.submit-btn{
-    display:block;
-    width:220px;
-    height:48px;
-    margin:25px auto 0;
-    background:#15803d;
-    color:#fff;
-    border:none;
-    border-radius:10px;
-    font-size:15px;
-    font-weight:700;
-    cursor:pointer;
-    transition:.3s ease;
+.submit-btn {
+    display: inline-block;
+    width: auto;
+    padding: 14px 40px;
+    background: #16A34A;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+.submit-btn:hover {
+    background: #15803D;
 }
 
 .submit-btn:hover{

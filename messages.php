@@ -1377,9 +1377,9 @@ $avatar_palette = ['#0E7A4E', '#0B5E3B', '#15803D', '#065F46', '#166534', '#1453
                                class="conversation-item <?php echo ($selected_conversation == $conv['user_id']) ? 'active' : ''; ?>"
                                data-name="<?php echo htmlspecialchars(strtolower($conv['full_name'])); ?>">
                                 <div class="conversation-avatar" style="background: <?php echo $avatar_color; ?>;">
-                                    <?php if (!empty($conv['profile_pic'])): ?>
-                                        <img src="<?php echo htmlspecialchars($conv['profile_pic']); ?>" alt="">
-                                    <?php else: ?>
+                                    <?php if (!empty($conv['profile_pic']) && file_exists('uploads/profiles/' . $conv['profile_pic'])): ?>
+                                    <img src="uploads/profiles/<?php echo htmlspecialchars($conv['profile_pic']); ?>" alt="">
+                                <?php else: ?>
                                         <?php echo strtoupper(substr($conv['full_name'], 0, 1)); ?>
                                     <?php endif; ?>
                                     <span class="online-dot"></span>
@@ -1447,10 +1447,10 @@ $avatar_palette = ['#0E7A4E', '#0B5E3B', '#15803D', '#065F46', '#166534', '#1453
                 <div class="chat-header">
                     <div class="chat-header-left">
                         <div class="chat-avatar" style="background: <?php echo $avatar_palette[0]; ?>;">
-                            <?php if (!empty($conversation_user['profile_pic'])): ?>
-                                <img src="<?php echo htmlspecialchars($conversation_user['profile_pic']); ?>" alt="">
-                            <?php else: ?>
-                                <?php echo strtoupper(substr($conversation_user['full_name'], 0, 1)); ?>
+                            <?php if (!empty($conversation_user['profile_pic']) && file_exists('uploads/profiles/' . $conversation_user['profile_pic'])): ?>
+                            <img src="uploads/profiles/<?php echo htmlspecialchars($conversation_user['profile_pic']); ?>" alt="">
+                        <?php else: ?>
+                            <?php echo strtoupper(substr($conversation_user['full_name'], 0, 1)); ?>
                             <?php endif; ?>
                             <span class="online-dot" style="width:11px;height:11px;bottom:1px;right:1px;"></span>
                         </div>
@@ -1536,9 +1536,9 @@ $avatar_palette = ['#0E7A4E', '#0B5E3B', '#15803D', '#065F46', '#166534', '#1453
                     ?>
                         <div class="message-row <?php echo $is_sent ? 'sent' : 'received'; ?>" data-msg-id="<?php echo $msg['id']; ?>">
                             <div class="msg-avatar-sm">
-                                <?php if (!empty($msg['sender_pic'])): ?>
-                                    <img src="<?php echo htmlspecialchars($msg['sender_pic']); ?>" alt="">
-                                <?php else: ?>
+                               <?php if (!empty($msg['sender_pic']) && file_exists('uploads/profiles/' . $msg['sender_pic'])): ?>
+                                <img src="uploads/profiles/<?php echo htmlspecialchars($msg['sender_pic']); ?>" alt="">
+                            <?php else: ?>
                                     <?php echo strtoupper(substr($msg['sender_name'] ?? '?', 0, 1)); ?>
                                 <?php endif; ?>
                             </div>
