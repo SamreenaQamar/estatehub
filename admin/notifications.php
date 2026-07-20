@@ -119,7 +119,7 @@ function timeAgoNotify($timestamp) {
     return date('M d, Y', strtotime($timestamp));
 }
 
-// Stats for sidebar
+// Stats for sidebar (NO BADGES - SAME AS INDEX)
 $stats = [
     'users' => 0,
     'pending' => 0,
@@ -171,7 +171,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
         .dashboard-wrapper { display:flex; min-height:100vh; background:#f4f6f5; }
 
-        /* ===== SIDEBAR - SAME AS OTHER ADMIN FILES ===== */
+        /* ===== SIDEBAR - SAME AS INDEX.PHP ===== */
         .sidebar {
             width: 250px;
             min-width: 250px;
@@ -277,18 +277,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             transform:scale(1.1);
         }
 
-        .nav-badge {
-            margin-left: auto;
-            background: #ef4444;
-            color: white;
-            border-radius: 50px;
-            padding: 2px 10px;
-            font-size: 10px;
-            font-weight: 700;
-            min-width: 22px;
-            text-align: center;
-        }
-        .nav-badge.blue { background: #0E7A4E; }
+        /* ===== NO BADGES - SAME AS INDEX ===== */
 
         /* ===== LOGOUT LINK ===== */
         .logout-link {
@@ -300,62 +289,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             box-shadow:0 8px 20px rgba(220,38,38,.35) !important;
         }
 
-        /* ===== SIDEBAR FOOTER ===== */
-        .sidebar-footer {
-            padding: 20px 16px;
-            border-top: 1px solid rgba(255,255,255,0.08);
-            flex-shrink: 0;
-            margin-top: auto;
-        }
-        .admin-profile-mini {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 14px;
-            cursor: pointer;
-            transition: .3s;
-        }
-        .admin-profile-mini:hover {
-            background: rgba(255,255,255,0.1);
-        }
-        .admin-avatar-mini {
-            width: 44px;
-            height: 44px;
-            min-width: 44px;
-            min-height: 44px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #f59e0b, #ef4444);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 18px;
-            color: white;
-            flex-shrink: 0;
-            overflow: hidden;
-        }
-        .admin-avatar-mini img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .admin-info-mini h4 {
-            font-size: 14px;
-            font-weight: 600;
-            color: #e2e8f0;
-        }
-        .admin-info-mini span {
-            font-size: 11px;
-            color: #64748b;
-        }
-
-        /* ===== MAIN CONTENT ===== */
-        .main-content { flex:1; overflow-y:auto; }
-        .content-inner { padding:28px 32px 40px; }
-
-        /* ===== TOP BAR ===== */
+        /* ===== TOP BAR - SAME AS INDEX.PHP ===== */
         .topbar {
             display: flex;
             align-items: center;
@@ -420,6 +354,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .user-info { display:flex; flex-direction:column; line-height:1.2; }
         .user-name { font-size:14px; font-weight:700; color:#0b1a2e; }
         .user-role { font-size:12px; color:#6b7a8f; }
+
+        /* ===== MAIN CONTENT ===== */
+        .main-content { flex:1; overflow-y:auto; }
+        .content-inner { padding:28px 32px 40px; }
 
         /* ===== NOTIFICATIONS CONTENT ===== */
         .page-header {
@@ -580,7 +518,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <body>
 <div class="dashboard-wrapper">
 
-    <!-- ===== SIDEBAR ===== -->
+    <!-- ===== SIDEBAR - SAME AS INDEX.PHP (NO BADGES) ===== -->
     <aside class="sidebar" id="adminSidebar">
         <div class="logo">
             <a href="../index.php">
@@ -607,7 +545,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <path d="M20 21a8 8 0 1 0-16 0"/>
                     </svg>
                     Users
-                    <span class="nav-badge"><?php echo $stats['users']; ?></span>
                 </a>
             </li>
             <li>
@@ -617,9 +554,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <polyline points="9 22 9 12 15 12 15 22"/>
                     </svg>
                     Properties
-                    <?php if ($stats['pending'] > 0): ?>
-                        <span class="nav-badge"><?php echo $stats['pending']; ?></span>
-                    <?php endif; ?>
                 </a>
             </li>
             <li>
@@ -628,9 +562,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                     </svg>
                     Messages
-                    <?php if ($stats['unread'] > 0): ?>
-                        <span class="nav-badge blue"><?php echo $stats['unread']; ?></span>
-                    <?php endif; ?>
                 </a>
             </li>
         </ul>
@@ -672,9 +603,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                     </svg>
                     Notifications
-                    <?php if ($unread_count > 0): ?>
-                        <span class="nav-badge"><?php echo $unread_count; ?></span>
-                    <?php endif; ?>
                 </a>
             </li>
             <li>
@@ -688,29 +616,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </a>
             </li>
         </ul>
-
-        <div class="sidebar-footer">
-            <div class="admin-profile-mini" onclick="window.location.href='profile.php'">
-                <div class="admin-avatar-mini">
-                    <?php if (!empty($profile_pic_path)): ?>
-                        <img src="<?php echo $profile_pic_path; ?>" alt="Admin" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                        <i class="fas fa-crown" style="display:none;"></i>
-                    <?php else: ?>
-                        <i class="fas fa-crown"></i>
-                    <?php endif; ?>
-                </div>
-                <div class="admin-info-mini">
-                    <h4><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'Admin'); ?></h4>
-                    <span>Super Admin</span>
-                </div>
-            </div>
-        </div>
     </aside>
 
     <!-- ===== MAIN CONTENT ===== -->
     <div class="main-content">
 
-        <!-- TOP BAR -->
+        <!-- TOP BAR - WITH BELL BADGE -->
         <header class="topbar">
             <button class="topbar-menu-btn" onclick="document.getElementById('adminSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>

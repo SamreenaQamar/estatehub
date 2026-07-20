@@ -109,50 +109,56 @@ sort($property_types);
 // ============================================
 // UNIQUE IMAGES PER PROPERTY
 // ============================================
-function getPropertyImages($type, $id) {
-    // Each property gets 4 unique images based on its ID
-    $allImages = [
-        'https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1396132/pexels-photo-1396132.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1571459/pexels-photo-1571459.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/2587054/pexels-photo-2587054.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/2587056/pexels-photo-2587056.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/2587052/pexels-photo-2587052.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/2587058/pexels-photo-2587058.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1571458/pexels-photo-1571458.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/323781/pexels-photo-323781.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/323782/pexels-photo-323782.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/323783/pexels-photo-323783.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/258154/pexels-photo-258154.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/258158/pexels-photo-258158.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/258159/pexels-photo-258159.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/258160/pexels-photo-258160.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1643384/pexels-photo-1643384.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1643385/pexels-photo-1643385.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1643386/pexels-photo-1643386.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/280229/pexels-photo-280229.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/280232/pexels-photo-280232.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/280233/pexels-photo-280233.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/280234/pexels-photo-280234.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/208736/pexels-photo-208736.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/208740/pexels-photo-208740.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/208738/pexels-photo-208738.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/208739/pexels-photo-208739.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1029599/pexels-photo-1029599.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/276724/pexels-photo-276724.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350'
-    ];
-    
-    // Use a unique seed based on property ID to get different images for each property
-    $seed = $id * 37 + 13;
-    $offset = $seed % count($allImages);
-    $images = [];
-    for ($i = 0; $i < 4; $i++) {
-        $images[] = $allImages[($offset + $i * 7) % count($allImages)];
+function getPropertyImages($type, $id)
+{
+    switch (strtolower(trim($type))) {
+
+        case 'house':
+            $folder = 'house';
+            break;
+
+        case 'apartment':
+            $folder = 'apartment';
+            break;
+
+        case 'plot':
+            $folder = 'plot';
+            break;
+
+        case 'commercial':
+            $folder = 'commercial';
+            break;
+
+        case 'farm house':
+            $folder = 'farmhouse';
+            break;
+
+        case 'villa':
+            $folder = 'villa';
+            break;
+
+        case 'penthouse':
+            $folder = 'penthouse';
+            break;
+
+        case 'portion':
+            $folder = 'portion';
+            break;
+
+        default:
+            $folder = 'house';
+            break;
     }
+
+    $images = [];
+
+    $start = ($id % 10) + 1;
+
+    for ($i = 0; $i < 4; $i++) {
+        $num = (($start + $i - 1) % 10) + 1;
+        $images[] = "assets/images/$folder/$num.jpg";
+    }
+
     return $images;
 }
 ?>
@@ -820,6 +826,9 @@ function getPropertyImages($type, $id) {
             <div class="properties-grid">
                 <?php while ($prop = mysqli_fetch_assoc($result)):
                     $images = getPropertyImages($prop['property_type'], $prop['id']);
+                    echo "<pre>";
+print_r($images);
+echo "</pre>";
                     $is_wishlisted = in_array($prop['title'], $wishlisted_titles ?? []);
                     // Format price
                     $price_formatted = number_format($prop['price'] / 1000000, 1);
@@ -831,8 +840,11 @@ function getPropertyImages($type, $id) {
                             <div class="slider-container">
                                 <div class="slider-track">
                                     <?php foreach ($images as $img): ?>
-                                        <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($prop['title']); ?>" loading="lazy">
-                                    <?php endforeach; ?>
+    <img src="<?php echo htmlspecialchars($img); ?>"
+         alt="<?php echo htmlspecialchars($prop['title']); ?>"
+         loading="lazy"
+         onerror="this.src='assets/images/house/1.jpg';">
+<?php endforeach; ?>
                                 </div>
                             </div>
                             <button class="slider-btn slider-prev" onclick="prevSlide('slider_<?php echo $prop['id']; ?>')">‹</button>

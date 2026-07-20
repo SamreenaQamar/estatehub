@@ -19,7 +19,13 @@ if ($_SESSION['user_type'] != 'seller') {
 $user_id   = $_SESSION['user_id'];
 $user_name = isset($_SESSION['user_name']) ? $_SESSION['user_name'] : 'Seller';
 
-// Fetch seller profile (for topbar avatar + unread messages badge, same as dashboard)
+// ============================================================
+// PROFILE PICTURE PATH
+// ============================================================
+$profile_pic_path = '';
+$pic_check = mysqli_query($conn, "SHOW COLUMNS FROM users LIKE 'profile_pic'");
+$has_pic_column = mysqli_num_rows($pic_check) > 0;
+
 $profile_query  = "SELECT u.*,
                     SUM(CASE WHEN m.is_read = 0 THEN 1 ELSE 0 END) as total_messages
                     FROM users u
@@ -29,7 +35,32 @@ $profile_query  = "SELECT u.*,
 $profile_result = mysqli_query($conn, $profile_query);
 $profile        = mysqli_fetch_assoc($profile_result);
 $total_messages = (int)($profile['total_messages'] ?? 0);
-$avatar_path    = $profile['avatar'] ?? ($profile['profile_image'] ?? '');
+
+if ($has_pic_column && !empty($profile['profile_pic'])) {
+    $pic_file = "uploads/profiles/" . $profile['profile_pic'];
+    if (file_exists($pic_file)) {
+        $profile_pic_path = $pic_file . '?t=' . time();
+    }
+}
+
+if (empty($profile_pic_path) && isset($_SESSION['profile_pic'])) {
+    $pic_file = "uploads/profiles/" . $_SESSION['profile_pic'];
+    if (file_exists($pic_file)) {
+        $profile_pic_path = $pic_file . '?t=' . time();
+    }
+}
+
+if (empty($profile_pic_path)) {
+    $found_files = glob("uploads/profiles/seller_" . $user_id . "_*");
+    if (!empty($found_files)) {
+        $profile_pic_path = $found_files[0] . '?t=' . time();
+        $_SESSION['profile_pic'] = basename($found_files[0]);
+        if ($has_pic_column) {
+            $safe_filename = mysqli_real_escape_string($conn, basename($found_files[0]));
+            mysqli_query($conn, "UPDATE users SET profile_pic = '$safe_filename' WHERE id = $user_id");
+        }
+    }
+}
 
 // ---------- Handle Delete ----------
 if (isset($_GET['delete'])) {
@@ -58,8 +89,6 @@ if ($status_filter !== '' && $status_filter !== 'All Status') {
 }
 if ($type_filter !== '' && $type_filter !== 'All Type') {
     $type_esc = mysqli_real_escape_string($conn, $type_filter);
-    // NOTE: adjust column name below to match your actual "type" column
-    // (e.g. property_type, type, category) if it differs in your schema.
     $where .= " AND property_type = '$type_esc'";
 }
 if ($city_filter !== '' && $city_filter !== 'All Cities') {
@@ -91,13 +120,12 @@ if ($props_result) {
     }
 }
 
-// ---------- Stats (unfiltered, whole portfolio) ----------
+// ---------- Stats ----------
 $total_properties    = (int)(mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM properties WHERE user_id=$user_id"))['c'] ?? 0);
 $active_properties   = (int)(mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM properties WHERE user_id=$user_id AND status='Active'"))['c'] ?? 0);
 $inactive_properties = (int)(mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM properties WHERE user_id=$user_id AND status!='Active'"))['c'] ?? 0);
 $total_views          = (int)(mysqli_fetch_assoc(mysqli_query($conn, "SELECT SUM(views) as v FROM properties WHERE user_id=$user_id"))['v'] ?? 0);
 
-// Month-over-month growth (same pattern as dashboard)
 $start_this_month = date('Y-m-01 00:00:00');
 
 $props_before   = (int)(mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM properties WHERE user_id=$user_id AND created_at < '$start_this_month'"))['c'] ?? 0);
@@ -112,7 +140,6 @@ $inactive_growth = $inactive_before > 0 ? round((($inactive_properties - $inacti
 $views_before   = (int)(mysqli_fetch_assoc(mysqli_query($conn, "SELECT SUM(views) as v FROM properties WHERE user_id=$user_id AND created_at < '$start_this_month'"))['v'] ?? 0);
 $views_growth   = $views_before > 0 ? round((($total_views - $views_before) / $views_before) * 100) : ($total_views > 0 ? 100 : 0);
 
-// Distinct cities for filter dropdown
 $cities = [];
 $city_result = mysqli_query($conn, "SELECT DISTINCT city FROM properties WHERE user_id=$user_id AND city IS NOT NULL AND city != '' ORDER BY city ASC");
 if ($city_result) { while ($row = mysqli_fetch_assoc($city_result)) { $cities[] = $row['city']; } }
@@ -129,7 +156,6 @@ function format_price_pk($price) {
 
 $current_page = basename($_SERVER['PHP_SELF']);
 
-// Helper to rebuild query string while overriding one param (for pagination links)
 function qs_with($params) {
     $current = $_GET;
     foreach ($params as $k => $v) { $current[$k] = $v; }
@@ -150,7 +176,7 @@ function qs_with($params) {
 
         .dashboard-wrapper { display:flex; min-height:100vh; background:#f4f6f5; }
 
-        /* ===== SIDEBAR ===== */
+        /* ===== SIDEBAR (exactly same as dashboard) ===== */
         .sidebar {
             width: 250px;
             min-width: 250px;
@@ -166,52 +192,16 @@ function qs_with($params) {
         .sidebar::-webkit-scrollbar { width:4px; }
         .sidebar::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:10px; }
 
-        .logo{
-            padding:0 4px 20px;
-            margin-bottom:20px;
-            border-bottom:1px solid rgba(255,255,255,0.06);
-        }
-        .logo a{
-            display:flex;
-            align-items:center;
-            gap:10px;
-            text-decoration:none;
-        }
-        .logo-icon{
-            font-size:30px;
-            color:#0E7A4E;
-            filter:drop-shadow(0 2px 6px rgba(14,122,78,0.3));
-        }
-        .logo-text{
-            font-size:29px;
-            font-weight:800;
-            letter-spacing:-0.5px;
-            color:#ffffff;
-            position:relative;
-        }
-        .logo-text::after{
-            content:'';
-            position:absolute;
-            left:0;
-            bottom:-10px;
-            width:45px;
-            height:3px;
-            background:#0E7A4E;
-            border-radius:10px;
-        }
+        .logo { padding:0 4px 20px; margin-bottom:20px; border-bottom:1px solid rgba(255,255,255,0.06); }
+        .logo a { display:flex; align-items:center; gap:10px; text-decoration:none; }
+        .logo-icon { font-size:30px; color:#0E7A4E; filter:drop-shadow(0 2px 6px rgba(14,122,78,0.3)); }
+        .logo-text { font-size:29px; font-weight:800; letter-spacing:-0.5px; color:#ffffff; position:relative; }
+        .logo-text::after { content:''; position:absolute; left:0; bottom:-10px; width:45px; height:3px; background:#0E7A4E; border-radius:10px; }
 
-        .sidebar-label {
-            font-size: 11px;
-            font-weight: 600;
-            color: rgba(255,255,255,0.3);
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            padding: 8px 12px;
-            margin-bottom: 6px;
-        }
+        .sidebar-label { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 1.5px; padding: 8px 12px; margin-bottom: 6px; }
         .sidebar-menu { list-style:none; padding:0; margin-bottom:12px; }
-        .sidebar-menu li{ margin-bottom:6px; }
-        .sidebar-menu a{
+        .sidebar-menu li { margin-bottom:6px; }
+        .sidebar-menu a {
             display:flex;
             align-items:center;
             gap:12px;
@@ -224,53 +214,36 @@ function qs_with($params) {
             font-size:14px;
             font-weight:600;
             transition:all .3s ease;
-            position:relative;
         }
-        .sidebar-menu a:hover{
+        .sidebar-menu a:hover {
             background:linear-gradient(135deg,#0E7A4E,#16a34a);
             color:#fff;
             transform:translateX(6px);
             box-shadow:0 8px 20px rgba(14,122,78,.35);
         }
-        .sidebar-menu a.active{
+        .sidebar-menu a svg { width:20px; height:20px; transition:.3s; flex-shrink:0; }
+        .sidebar-menu a:hover svg { transform:scale(1.15); }
+        .sidebar-menu a.active {
             background:linear-gradient(135deg,#0E7A4E,#16a34a);
             color:#fff;
             box-shadow:0 8px 20px rgba(14,122,78,.35);
         }
-        .sidebar-menu a svg{ width:20px; height:20px; transition:.3s; flex-shrink:0; }
-        .sidebar-menu a:hover svg{ transform:scale(1.15); }
-        .sidebar-menu a.active svg{ transform:scale(1.1); }
-        .sidebar-menu a .badge{
-            background:#ef4444;
-            color:#fff;
-            font-size:10px;
-            font-weight:700;
-            padding:2px 7px;
-            border-radius:10px;
-            margin-left:auto;
+        .sidebar-menu a.active svg { transform:scale(1.1); }
+        .badge {
+            margin-left: auto;
+            background: #ef4444;
+            color: white;
+            border-radius: 50px;
+            padding: 2px 10px;
+            font-size: 10px;
+            font-weight: 700;
+            min-width: 22px;
+            text-align: center;
         }
+        .logout-link { color:#b8c2cc !important; }
+        .logout-link:hover { background:linear-gradient(135deg,#dc2626,#ef4444) !important; color:#fff !important; box-shadow:0 8px 20px rgba(220,38,38,.35) !important; }
 
-        .sidebar-upgrade{
-            margin-top:20px;
-            background:linear-gradient(160deg,#0E7A4E,#0a5c3a);
-            border-radius:16px;
-            padding:18px;
-            color:#fff;
-        }
-        .sidebar-upgrade h4{ font-size:14px; font-weight:700; margin-bottom:6px; }
-        .sidebar-upgrade p{ font-size:11.5px; opacity:.85; line-height:1.5; margin-bottom:12px; }
-        .sidebar-upgrade a{
-            display:inline-block;
-            background:#fff;
-            color:#0E7A4E;
-            font-size:12px;
-            font-weight:700;
-            padding:8px 14px;
-            border-radius:8px;
-            text-decoration:none;
-        }
-
-        /* ===== TOP BAR ===== */
+        /* ===== TOP BAR (no notification icon) ===== */
         .topbar {
             display: flex;
             align-items: center;
@@ -285,52 +258,13 @@ function qs_with($params) {
         }
         .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; }
         .topbar-search { flex:1; max-width:500px; position:relative; }
-        .topbar-search input {
-            width:100%;
-            padding:9px 40px 9px 16px;
-            border-radius:10px;
-            border:1px solid #e9ecef;
-            background:#f8fafc;
-            font-size:14px;
-            outline:none;
-            transition:0.2s;
-        }
+        .topbar-search input { width:100%; padding:9px 40px 9px 16px; border-radius:10px; border:1px solid #e9ecef; background:#f8fafc; font-size:14px; outline:none; transition:0.2s; }
         .topbar-search input:focus { border-color:#0E7A4E; background:#fff; }
         .topbar-search svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:#adb5bd; }
 
-        .topbar-actions { display:flex; align-items:center; gap:16px; }
-        .icon-btn {
-            position: relative;
-            width: 38px;
-            height: 38px;
-            border-radius: 10px;
-            background: #f8fafc;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition:0.2s;
-            color:#1e293b;
-        }
-        .icon-btn:hover { background:#e9ecef; }
-        .icon-btn svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2; }
-        .icon-btn .count {
-            position:absolute; top:-4px; right:-4px;
-            background:#ef4444; color:#fff;
-            font-size:10px; font-weight:700;
-            min-width:18px; height:18px; border-radius:50%;
-            display:flex; align-items:center; justify-content:center;
-            border:2px solid #fff;
-        }
+        .topbar-actions { display:flex; align-items:center; gap:10px; }
         .user-chip { display:flex; align-items:center; gap:10px; text-decoration:none; }
-        .user-avatar {
-            width:36px; height:36px; border-radius:10px;
-            background:#0E7A4E; color:#fff;
-            display:flex; align-items:center; justify-content:center;
-            font-weight:700; font-size:15px; overflow:hidden;
-            flex-shrink:0;
-        }
+        .user-avatar { width:36px; height:36px; border-radius:10px; background:#0E7A4E; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; overflow:hidden; flex-shrink:0; }
         .user-avatar img { width:100%; height:100%; object-fit:cover; }
         .user-info { display:flex; flex-direction:column; line-height:1.2; }
         .user-name { font-size:14px; font-weight:700; color:#0b1a2e; }
@@ -340,7 +274,6 @@ function qs_with($params) {
         .main-content { flex:1; overflow-y:auto; }
         .content-inner { padding:28px 32px 40px; }
 
-        /* Page header */
         .page-header{
             display:flex;
             justify-content:space-between;
@@ -375,7 +308,6 @@ function qs_with($params) {
         }
         .btn-add:hover{ background:#0a5c3a; transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,0.15); }
 
-        /* Stats */
         .stats-grid{
             display:grid;
             grid-template-columns:repeat(4,1fr);
@@ -421,7 +353,6 @@ function qs_with($params) {
         .stat-growth.down{ color:#ef4444; }
         .stat-growth.neutral{ color:#94a3b8; }
 
-        /* Filters bar */
         .filters-card{
             background:#fff;
             border-radius:16px;
@@ -483,7 +414,6 @@ function qs_with($params) {
         .btn-filters:hover{ background:#f8fafc; }
         .btn-filters svg{ width:16px; height:16px; }
 
-        /* Table */
         .table-card{
             background:#fff;
             border-radius:18px;
@@ -567,13 +497,11 @@ function qs_with($params) {
         .action-delete{ background:#fef2f2; color:#ef4444; }
         .action-delete:hover{ background:#fee2e2; }
 
-        /* Empty state */
         .empty-state{ text-align:center; padding:60px 20px; }
         .empty-state svg{ width:56px; height:56px; color:#cbd5e1; margin-bottom:14px; }
         .empty-state p{ color:#64748b; font-size:14px; margin-bottom:10px; }
         .empty-state a{ color:#0E7A4E; text-decoration:none; font-weight:700; }
 
-        /* Pagination */
         .pagination-bar{
             display:flex;
             align-items:center;
@@ -599,34 +527,16 @@ function qs_with($params) {
         .pagination .active{ background:#0E7A4E; color:#fff; border-color:#0E7A4E; }
         .pagination .disabled{ opacity:0.4; pointer-events:none; }
 
-        /* Responsive */
-        @media (max-width:1200px) {
-            .stats-grid { grid-template-columns:repeat(2,1fr); }
-        }
-        @media (max-width:1100px) {
-            .sidebar { position:fixed; left:-280px; transition:left 0.3s; }
-            .sidebar.open { left:0; }
-            .topbar-menu-btn { display:flex; }
-            .table-card{ overflow-x:auto; }
-            table{ min-width:900px; }
-        }
-        @media (max-width:768px) {
-            .content-inner { padding:18px; }
-            .topbar { padding:12px 18px; }
-            .stats-grid { grid-template-columns:1fr 1fr; gap:12px; }
-            .user-info { display:none; }
-            .topbar-search { max-width:none; }
-            .page-header{ flex-direction:column; }
-        }
-        @media (max-width:480px) {
-            .stats-grid { grid-template-columns:1fr; }
-        }
+        @media (max-width:1200px) { .stats-grid { grid-template-columns:repeat(2,1fr); } }
+        @media (max-width:1100px) { .sidebar { position:fixed; left:-280px; transition:left 0.3s; } .sidebar.open { left:0; } .topbar-menu-btn { display:flex; } .table-card{ overflow-x:auto; } table{ min-width:900px; } }
+        @media (max-width:768px) { .content-inner { padding:18px; } .topbar { padding:12px 18px; } .stats-grid { grid-template-columns:1fr 1fr; gap:12px; } .user-info { display:none; } .topbar-search { max-width:none; } .page-header{ flex-direction:column; } }
+        @media (max-width:480px) { .stats-grid { grid-template-columns:1fr; } }
     </style>
 </head>
 <body>
 <div class="dashboard-wrapper">
 
-    <!-- SIDEBAR -->
+    <!-- SIDEBAR (exactly same SVG icons as dashboard) -->
     <aside class="sidebar" id="sellerSidebar">
         <div class="logo">
             <a href="index.php">
@@ -636,52 +546,66 @@ function qs_with($params) {
         </div>
         <div class="sidebar-label">Main Menu</div>
         <ul class="sidebar-menu">
-            <li><a href="seller-dashboard.php" class="<?php echo ($current_page == 'seller-dashboard.php') ? 'active' : ''; ?>">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
-                Dashboard
-            </a></li>
-            <li><a href="my-properties.php" class="<?php echo ($current_page == 'my-properties.php') ? 'active' : ''; ?>">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                My Properties
-            </a></li>
-            <li><a href="add-property.php" class="<?php echo ($current_page == 'add-property.php') ? 'active' : ''; ?>">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                Add Property
-            </a></li>
-            <li><a href="messages.php" class="<?php echo ($current_page == 'messages.php') ? 'active' : ''; ?>">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                Messages
-                <?php if ($total_messages > 0): ?><span class="badge"><?php echo $total_messages; ?></span><?php endif; ?>
-            </a></li>
-            <li><a href="wishlist.php" class="<?php echo ($current_page == 'wishlist.php') ? 'active' : ''; ?>">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                Wishlist
-            </a></li>
-        
+            <li>
+                <a href="seller-dashboard.php" class="<?php echo ($current_page == 'seller-dashboard.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+                    Dashboard
+                </a>
+            </li>
+            <li>
+                <a href="my-properties.php" class="<?php echo ($current_page == 'my-properties.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    My Properties
+                </a>
+            </li>
+            <li>
+                <a href="add-property.php" class="<?php echo ($current_page == 'add-property.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                    Add Property
+                </a>
+            </li>
+            <li>
+                <a href="messages.php" class="<?php echo ($current_page == 'messages.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    Messages
+                    <?php if ($total_messages > 0): ?><span class="badge"><?php echo $total_messages; ?></span><?php endif; ?>
+                </a>
+            </li>
+            <li>
+                <a href="wishlist.php" class="<?php echo ($current_page == 'wishlist.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                    Wishlist
+                </a>
+            </li>
         </ul>
 
         <div class="sidebar-label">Account</div>
         <ul class="sidebar-menu">
-            <li><a href="profile-settings.php" class="<?php echo ($current_page == 'profile-settings.php') ? 'active' : ''; ?>">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M5 20v-2a7 7 0 0 1 14 0v2"/></svg>
-                Profile Settings
-            </a></li>
-            <li><a href="settings.php" class="<?php echo ($current_page == 'settings.php') ? 'active' : ''; ?>">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                Settings
-            </a></li>
-            <li><a href="logout.php" class="logout-link">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                Logout
-            </a></li>
+            <li>
+                <a href="profile-settings.php" class="<?php echo ($current_page == 'profile-settings.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M5 20v-2a7 7 0 0 1 14 0v2"/></svg>
+                    Profile Settings
+                </a>
+            </li>
+            <li>
+                <a href="settings.php" class="<?php echo ($current_page == 'settings.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    Settings
+                </a>
+            </li>
+            <li>
+                <a href="logout.php" class="logout-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Logout
+                </a>
+            </li>
         </ul>
-
     </aside>
 
     <!-- MAIN -->
     <div class="main-content">
 
-        <!-- TOP BAR -->
+        <!-- TOP BAR (no notification icon) -->
         <header class="topbar">
             <button class="topbar-menu-btn" onclick="document.getElementById('sellerSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -693,15 +617,10 @@ function qs_with($params) {
             </div>
 
             <div class="topbar-actions">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                    <?php if ($total_messages > 0): ?>
-                        <span class="count"><?php echo $total_messages > 9 ? '9+' : $total_messages; ?></span>
-                    <?php endif; ?>
-                </button>
                 <a href="profile-settings.php" class="user-chip">
                     <div class="user-avatar">
-                        <?php if (!empty($avatar_path)): ?>
-                            <img src="<?php echo htmlspecialchars($avatar_path); ?>" alt="<?php echo htmlspecialchars($user_name); ?>">
+                        <?php if (!empty($profile_pic_path)): ?>
+                            <img src="<?php echo htmlspecialchars($profile_pic_path); ?>" alt="<?php echo htmlspecialchars($user_name); ?>">
                         <?php else: ?>
                             <?php echo strtoupper(substr($user_name, 0, 1)); ?>
                         <?php endif; ?>

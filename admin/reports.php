@@ -240,18 +240,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             transform:scale(1.1);
         }
 
-        .nav-badge {
-            margin-left: auto;
-            background: #ef4444;
-            color: white;
-            border-radius: 50px;
-            padding: 2px 10px;
-            font-size: 10px;
-            font-weight: 700;
-            min-width: 22px;
-            text-align: center;
-        }
-        .nav-badge.blue { background: #0E7A4E; }
+        /* ===== NO BADGES - REMOVED ===== */
 
         /* ===== LOGOUT LINK ===== */
         .logout-link {
@@ -312,14 +301,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         }
         .icon-btn:hover { background:#e9ecef; }
         .icon-btn svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2; }
-        .icon-btn .count {
-            position:absolute; top:-4px; right:-4px;
-            background:#ef4444; color:#fff;
-            font-size:10px; font-weight:700;
-            min-width:18px; height:18px; border-radius:50%;
-            display:flex; align-items:center; justify-content:center;
-            border:2px solid #fff;
-        }
+        /* .count removed - no badge on bell */
         .user-chip { display:flex; align-items:center; gap:10px; text-decoration:none; }
         .user-avatar {
             width:36px; height:36px; border-radius:10px;
@@ -509,7 +491,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <body>
 <div class="dashboard-wrapper">
 
-    <!-- ===== SIDEBAR - SAME AS SELLER ===== -->
+    <!-- ===== SIDEBAR - EXACTLY AS INDEX.PHP (with Profile & Notifications, no badges) ===== -->
     <aside class="sidebar" id="adminSidebar">
         <div class="logo">
             <a href="../index.php">
@@ -536,7 +518,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <path d="M20 21a8 8 0 1 0-16 0"/>
                     </svg>
                     Users
-                    <span class="nav-badge"><?php echo $stats['users']; ?></span>
                 </a>
             </li>
             <li>
@@ -546,9 +527,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <polyline points="9 22 9 12 15 12 15 22"/>
                     </svg>
                     Properties
-                    <?php if ($stats['pending'] > 0): ?>
-                        <span class="nav-badge"><?php echo $stats['pending']; ?></span>
-                    <?php endif; ?>
                 </a>
             </li>
             <li>
@@ -557,9 +535,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                     </svg>
                     Messages
-                    <?php if ($stats['unread'] > 0): ?>
-                        <span class="nav-badge blue"><?php echo $stats['unread']; ?></span>
-                    <?php endif; ?>
                 </a>
             </li>
         </ul>
@@ -587,6 +562,23 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </a>
             </li>
             <li>
+                <a href="profile.php" class="<?php echo ($current_page == 'profile.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="8" r="4"/>
+                        <path d="M5 20v-2a7 7 0 0 1 14 0v2"/>
+                    </svg>
+                    Profile
+                </a>
+            </li>
+            <li>
+                <a href="notifications.php" class="<?php echo ($current_page == 'notifications.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
+                    Notifications
+                </a>
+            </li>
+            <li>
                 <a href="../logout.php" class="logout-link">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -602,7 +594,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- ===== MAIN CONTENT ===== -->
     <div class="main-content">
 
-        <!-- TOP BAR -->
+        <!-- TOP BAR (with notification bell, no badge) -->
         <header class="topbar">
             <button class="topbar-menu-btn" onclick="document.getElementById('adminSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -614,10 +606,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
             </div>
 
             <div class="topbar-actions">
-                <button class="icon-btn" title="Notifications">
+                <!-- Notification bell (no count) -->
+                <button class="icon-btn" title="Notifications" onclick="window.location.href='notifications.php'">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                    <span class="count">3</span>
                 </button>
+
                 <a href="profile.php" class="user-chip">
                     <div class="user-avatar">
                         <?php if (!empty($profile_pic_path)): ?>
@@ -636,11 +629,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
         <div class="content-inner">
 
-            <!-- Page Header -->
-            <div class="page-header">
-                <h1>Analytics & Reports</h1>
-                <p>Monitor platform performance, revenue trends and user growth</p>
-            </div>
+                       
 
             <!-- Stats -->
             <div class="stats-grid">

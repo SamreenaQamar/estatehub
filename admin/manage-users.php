@@ -77,17 +77,13 @@ function status_label($status) {
 $message = '';
 $messageType = '';
 
-// Pick up a flash message left by a previous redirect (see PRG pattern below)
+// Pick up a flash message left by a previous redirect
 if (!empty($_SESSION['flash_message'])) {
     $message = $_SESSION['flash_message'];
     $messageType = $_SESSION['flash_type'] ?? 'success';
     unset($_SESSION['flash_message'], $_SESSION['flash_type']);
 }
 
-// Helper: redirect back to this page (preserving filter/search/page) after a
-// state-changing POST, carrying the result message via session flash.
-// This avoids the "status doesn't seem to update" issue caused by resubmitted
-// POST data / stale form state, and guarantees a fresh SELECT on reload.
 function redirect_with_flash($msg, $type) {
     $_SESSION['flash_message'] = $msg;
     $_SESSION['flash_type'] = $type;
@@ -98,7 +94,7 @@ function redirect_with_flash($msg, $type) {
 }
 
 // =========================================================
-// ADD / EDIT / STATUS ACTIONS (same logic as before)
+// ADD / EDIT / STATUS ACTIONS
 // =========================================================
 if (isset($_POST['add_user'])) {
     verify_csrf();
@@ -173,6 +169,9 @@ if (isset($_POST['edit_user'])) {
     }
 }
 
+// =========================================================
+// CHANGE STATUS - FIXED: This is where the status update happens
+// =========================================================
 if (isset($_POST['change_status'])) {
     verify_csrf();
     $id     = (int)$_POST['user_id'];
@@ -187,26 +186,38 @@ if (isset($_POST['change_status'])) {
     ];
 
     if (isset($map[$action]) && $id > 0) {
+        // Prevent admin from blocking/deleting themselves
         if ($id === (int)$_SESSION['user_id'] && in_array($action, ['block', 'delete'], true)) {
             $message = "You cannot block or delete your own admin account.";
             $messageType = "error";
         } else {
             $new_status = $map[$action];
+            
+            // Debug: Log the action
+            error_log("Changing user $id status to $new_status via action: $action");
+            
             $stmt = mysqli_prepare($conn, "UPDATE users SET status = ? WHERE id = ?");
             mysqli_stmt_bind_param($stmt, 'si', $new_status, $id);
+            
             if (mysqli_stmt_execute($stmt)) {
                 mysqli_stmt_close($stmt);
                 $labels = [
-                    'block' => 'blocked', 'unblock' => 'unblocked', 'approve' => 'approved',
-                    'delete' => 'deleted (soft delete)', 'restore' => 'restored',
+                    'block' => 'blocked', 
+                    'unblock' => 'unblocked', 
+                    'approve' => 'approved',
+                    'delete' => 'deleted (soft delete)', 
+                    'restore' => 'restored',
                 ];
                 redirect_with_flash("User has been " . $labels[$action] . " successfully.", "success");
             } else {
-                $message = "Could not update user status.";
+                $message = "Could not update user status: " . mysqli_error($conn);
                 $messageType = "error";
                 mysqli_stmt_close($stmt);
             }
         }
+    } else {
+        $message = "Invalid action or user ID.";
+        $messageType = "error";
     }
 }
 
@@ -230,6 +241,7 @@ if (in_array($filter, ['admin', 'seller', 'user'], true)) {
     $params[] = $filter;
     $types .= 's';
 } else {
+    // Show all except deleted by default
     $where[] = "status != 'deleted'";
 }
 
@@ -281,7 +293,7 @@ mysqli_stmt_execute($stmt);
 $users = mysqli_stmt_get_result($stmt);
 
 // =========================================================
-// DASHBOARD STATISTICS
+// DASHBOARD STATISTICS - REAL DATA
 // =========================================================
 $user_stats = [
     'total' => 0, 'active' => 0, 'pending' => 0, 'blocked' => 0, 'deleted' => 0,
@@ -295,7 +307,7 @@ if ($r) {
         if (isset($user_stats[$s])) $user_stats[$s] = (int)$row['c'];
     }
 }
-$user_stats['total'] = $user_stats['active'] + $user_stats['pending'] + $user_stats['blocked'];
+$user_stats['total'] = $user_stats['active'] + $user_stats['pending'] + $user_stats['blocked'] + $user_stats['deleted'];
 
 $r = mysqli_query($conn, "SELECT user_type, COUNT(*) c FROM users WHERE status != 'deleted' GROUP BY user_type");
 if ($r) {
@@ -334,14 +346,14 @@ if (!empty($found)) {
     $profile_pic_path = $found[0] . '?t=' . time();
 }
 
-// Avatar color palette (rotates per row, soft-background style like the reference design)
+// Avatar color palette
 $AVATAR_PALETTE = [
-    ['bg' => '#dcfce7', 'color' => '#0E7A4E'], // green
-    ['bg' => '#dbeafe', 'color' => '#2563eb'], // blue
-    ['bg' => '#ffedd5', 'color' => '#c2410c'], // orange
-    ['bg' => '#fce7f3', 'color' => '#be185d'], // pink
-    ['bg' => '#f1f5f9', 'color' => '#475569'], // grey
-    ['bg' => '#ede9fe', 'color' => '#6d28d9'], // purple
+    ['bg' => '#dcfce7', 'color' => '#0E7A4E'],
+    ['bg' => '#dbeafe', 'color' => '#2563eb'],
+    ['bg' => '#ffedd5', 'color' => '#c2410c'],
+    ['bg' => '#fce7f3', 'color' => '#be185d'],
+    ['bg' => '#f1f5f9', 'color' => '#475569'],
+    ['bg' => '#ede9fe', 'color' => '#6d28d9'],
 ];
 
 $page_title = 'Manage Users';
@@ -361,7 +373,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
         .dashboard-wrapper { display:flex; min-height:100vh; background:#f4f6f5; }
 
-        /* ===== SIDEBAR - SAME AS ESTATEHUB THEME (UNCHANGED) ===== */
+        /* ===== SIDEBAR ===== */
         .sidebar {
             width: 250px;
             min-width: 250px;
@@ -487,11 +499,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             box-shadow:0 8px 20px rgba(220,38,38,.35) !important;
         }
 
-        /* ===== MAIN CONTENT ===== */
-        .main-content { flex:1; overflow-y:auto; }
-        .content-inner { padding:28px 32px 40px; }
-
-        /* ===== TOP BAR - matches reference (notification bell + admin dropdown) ===== */
+        /* ===== TOP BAR ===== */
         .topbar {
             display: flex;
             align-items: center;
@@ -545,8 +553,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .user-info i.fa-chevron-down { font-size:11px; color:#94a3b8; }
 
         /* ============================================================
-           CONTENT AREA – MATCHED TO REFERENCE DESIGN
+           CONTENT AREA
            ============================================================ */
+        .main-content { flex:1; overflow-y:auto; }
+        .content-inner { padding:28px 32px 40px; }
+
         .page-header {
             margin-bottom:28px;
             position:relative;
@@ -568,7 +579,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             right:0;
         }
 
-        /* Stats Grid – row 1: 5 small cards, row 2: 3 wide cards (matches reference) */
+        /* Stats Grid */
         .stats-grid-top {
             display:grid;
             grid-template-columns:repeat(5,1fr);
@@ -623,7 +634,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .stat-card .icon.red { background:#fee2e2; color:#dc2626; }
         .stat-card .icon.gray { background:#f1f5f9; color:#475569; }
 
-        /* Filter Tabs (role filters) */
+        /* Filter Tabs */
         .filter-tabs {
             display:flex;
             gap:8px;
@@ -652,7 +663,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         /* Actions Bar */
         .actions-bar {
             display:flex;
-            justify-content:flex-end;
+            justify-content:space-between;
             align-items:center;
             margin-bottom:20px;
             flex-wrap:wrap;
@@ -787,7 +798,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             color:#94a3b8;
         }
 
-        /* Contact column */
         .contact-cell {
             display:flex;
             flex-direction:column;
@@ -797,53 +807,54 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .contact-cell .email { font-weight:500; }
         .contact-cell .phone { font-size:12px; color:#94a3b8; }
 
-        /* Role badges – simple dot + label style (matches reference) */
+        /* ===== ROLE BADGE with transparent background ===== */
         .role-badge {
             display:inline-flex;
             align-items:center;
             gap:8px;
-            font-size:13.5px;
+            padding:6px 14px 6px 10px;
+            border-radius:30px;
+            font-size:13px;
             font-weight:600;
         }
-        .role-badge::before {
-            content:'';
+        .role-badge .dot {
             width:8px;
             height:8px;
             border-radius:50%;
             display:inline-block;
         }
-        .role-badge.admin { color:#dc2626; }
-        .role-badge.admin::before { background:#dc2626; }
-        .role-badge.seller { color:#0E7A4E; }
-        .role-badge.seller::before { background:#0E7A4E; }
-        .role-badge.buyer { color:#2563eb; }
-        .role-badge.buyer::before { background:#2563eb; }
+        .role-badge.admin { background:rgba(220, 38, 38, 0.12); color:#dc2626; }
+        .role-badge.admin .dot { background:#dc2626; }
+        .role-badge.seller { background:rgba(14, 122, 78, 0.12); color:#0E7A4E; }
+        .role-badge.seller .dot { background:#0E7A4E; }
+        .role-badge.buyer { background:rgba(37, 99, 235, 0.12); color:#2563eb; }
+        .role-badge.buyer .dot { background:#2563eb; }
 
-        /* Status badges – simple dot + label style (matches reference) */
+        /* ===== STATUS BADGE with transparent background ===== */
         .status-badge {
             display:inline-flex;
             align-items:center;
             gap:8px;
-            font-size:13.5px;
+            padding:6px 14px 6px 10px;
+            border-radius:30px;
+            font-size:13px;
             font-weight:600;
         }
-        .status-badge::before {
-            content:'';
+        .status-badge .dot {
             width:8px;
             height:8px;
             border-radius:50%;
             display:inline-block;
         }
-        .status-badge.active { color:#15803d; }
-        .status-badge.active::before { background:#22c55e; }
-        .status-badge.pending { color:#b45309; }
-        .status-badge.pending::before { background:#f59e0b; }
-        .status-badge.blocked { color:#dc2626; }
-        .status-badge.blocked::before { background:#dc2626; }
-        .status-badge.deleted { color:#475569; }
-        .status-badge.deleted::before { background:#94a3b8; }
+        .status-badge.active { background:rgba(34, 197, 94, 0.15); color:#15803d; }
+        .status-badge.active .dot { background:#22c55e; }
+        .status-badge.pending { background:rgba(245, 158, 11, 0.15); color:#b45309; }
+        .status-badge.pending .dot { background:#f59e0b; }
+        .status-badge.blocked { background:rgba(220, 38, 38, 0.15); color:#dc2626; }
+        .status-badge.blocked .dot { background:#dc2626; }
+        .status-badge.deleted { background:rgba(71, 85, 105, 0.12); color:#475569; }
+        .status-badge.deleted .dot { background:#94a3b8; }
 
-        /* Joined */
         .joined-cell {
             font-size:13px;
             color:#0b1a2e;
@@ -857,7 +868,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             margin-top:2px;
         }
 
-        /* Actions - circular icon buttons (matches reference design) */
+        /* Actions */
         .actions-cell {
             display:flex;
             gap:8px;
@@ -941,7 +952,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             pointer-events:none;
         }
 
-        /* Modals (unchanged functionality) */
+        /* Modals */
         .modal-overlay {
             position:fixed;
             top:0; left:0; right:0; bottom:0;
@@ -1077,7 +1088,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <body>
 <div class="dashboard-wrapper">
 
-    <!-- ===== SIDEBAR - UNCHANGED ===== -->
+    <!-- ===== SIDEBAR ===== -->
     <aside class="sidebar" id="adminSidebar">
         <div class="logo">
             <a href="../index.php">
@@ -1186,9 +1197,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
             </button>
 
             <div class="topbar-actions">
-                <button class="icon-btn" title="Notifications">
+                <button class="icon-btn" title="Notifications" onclick="window.location.href='notifications.php'">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                    <span class="count"><?php echo $stats['unread'] > 0 ? $stats['unread'] : 5; ?></span>
+                    <span class="count"><?php echo $stats['unread'] > 0 ? $stats['unread'] : 0; ?></span>
                 </button>
                 <a href="profile.php" class="user-chip">
                     <div class="user-info">
@@ -1206,9 +1217,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             </div>
         </header>
 
-        <!-- ================================================================
-             CONTENT AREA
-             ================================================================ -->
+        <!-- CONTENT AREA -->
         <div class="content-inner">
 
             <!-- Page Header -->
@@ -1229,41 +1238,41 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </div>
             <?php endif; ?>
 
-            <!-- Statistics Cards: Row 1 = 5 cards, Row 2 = 3 cards (matches reference) -->
+            <!-- Statistics Cards -->
             <div class="stats-grid-top">
                 <div class="stat-card">
                     <span class="icon green"><i class="fas fa-users"></i></span>
                     <div>
                         <div class="label">Total Users</div>
-                        <div class="number"><?php echo str_pad($user_stats['total'], 2, '0', STR_PAD_LEFT); ?></div>
+                        <div class="number"><?php echo $user_stats['total']; ?></div>
                     </div>
                 </div>
                 <div class="stat-card">
                     <span class="icon green"><i class="fas fa-user-check"></i></span>
                     <div>
                         <div class="label">Active Users</div>
-                        <div class="number"><?php echo str_pad($user_stats['active'], 2, '0', STR_PAD_LEFT); ?></div>
+                        <div class="number"><?php echo $user_stats['active']; ?></div>
                     </div>
                 </div>
                 <div class="stat-card">
                     <span class="icon amber"><i class="fas fa-user-clock"></i></span>
                     <div>
                         <div class="label">Pending Users</div>
-                        <div class="number"><?php echo str_pad($user_stats['pending'], 2, '0', STR_PAD_LEFT); ?></div>
+                        <div class="number"><?php echo $user_stats['pending']; ?></div>
                     </div>
                 </div>
                 <div class="stat-card">
                     <span class="icon red"><i class="fas fa-user-shield"></i></span>
                     <div>
                         <div class="label">Blocked Users</div>
-                        <div class="number"><?php echo str_pad($user_stats['blocked'], 2, '0', STR_PAD_LEFT); ?></div>
+                        <div class="number"><?php echo $user_stats['blocked']; ?></div>
                     </div>
                 </div>
                 <div class="stat-card">
                     <span class="icon gray"><i class="fas fa-trash-can"></i></span>
                     <div>
                         <div class="label">Deleted Users</div>
-                        <div class="number"><?php echo str_pad($user_stats['deleted'], 2, '0', STR_PAD_LEFT); ?></div>
+                        <div class="number"><?php echo $user_stats['deleted']; ?></div>
                     </div>
                 </div>
             </div>
@@ -1292,13 +1301,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </div>
             </div>
 
-            <!-- Filter Tabs + Search (matches reference layout) -->
-            <div class="actions-bar" style="justify-content:space-between;">
+            <!-- Filter Tabs + Search -->
+            <div class="actions-bar">
                 <div class="filter-tabs" style="margin-bottom:0;">
                     <a href="?filter=all" class="filter-tab <?php echo $filter == 'all' ? 'active' : ''; ?>">All Users</a>
                     <a href="?filter=admin" class="filter-tab <?php echo $filter == 'admin' ? 'active' : ''; ?>">Admins</a>
                     <a href="?filter=seller" class="filter-tab <?php echo $filter == 'seller' ? 'active' : ''; ?>">Sellers</a>
                     <a href="?filter=user" class="filter-tab <?php echo $filter == 'user' ? 'active' : ''; ?>">Buyers</a>
+                    <a href="?filter=blocked" class="filter-tab <?php echo $filter == 'blocked' ? 'active' : ''; ?>">Blocked</a>
+                    <a href="?filter=pending" class="filter-tab <?php echo $filter == 'pending' ? 'active' : ''; ?>">Pending</a>
                 </div>
 
                 <form method="GET" style="display:flex; gap:10px; align-items:center;">
@@ -1344,7 +1355,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 'total_properties' => $role === 'seller' ? $total_properties : null,
                             ];
 
-                            // Get initials for avatar
                             $name_parts = explode(' ', trim($user['full_name']));
                             $initials = '';
                             if (count($name_parts) >= 2) {
@@ -1352,7 +1362,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             } else {
                                 $initials = strtoupper(substr($user['full_name'], 0, 2));
                             }
-                            // Check if profile_pic exists
                             $avatar_img = '';
                             if (!empty($user['profile_pic']) && file_exists("../uploads/profiles/" . $user['profile_pic'])) {
                                 $avatar_img = "../uploads/profiles/" . $user['profile_pic'];
@@ -1383,16 +1392,18 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 <span class="phone"><?php echo htmlspecialchars($user['phone'] ?? ''); ?></span>
                             </div>
 
-                            <!-- ROLE -->
+                            <!-- ROLE with transparent background -->
                             <div>
                                 <span class="role-badge <?php echo role_class($role); ?>">
+                                    <span class="dot"></span>
                                     <?php echo role_label($role); ?>
                                 </span>
                             </div>
 
-                            <!-- STATUS -->
+                            <!-- STATUS with transparent background -->
                             <div>
                                 <span class="status-badge <?php echo $status; ?>">
+                                    <span class="dot"></span>
                                     <?php echo status_label($status); ?>
                                 </span>
                             </div>
@@ -1517,11 +1528,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <?php endif; ?>
             </div>
 
-        </div> <!-- /.content-inner -->
-    </div> <!-- /.main-content -->
-</div> <!-- /.dashboard-wrapper -->
+        </div>
+    </div>
+</div>
 
-<!-- ===== MODALS (unchanged) ===== -->
+<!-- ===== MODALS ===== -->
 <div class="modal-overlay" id="addModal">
     <div class="modal">
         <h2>Add New User</h2>
@@ -1739,6 +1750,13 @@ document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
         if (e.target === this) this.classList.remove('active');
     });
 });
+
+// Auto-refresh page after status change to show updated UI
+setTimeout(function() {
+    if (document.querySelector('.alert-success')) {
+        location.reload();
+    }
+}, 3000);
 </script>
 
 </body>

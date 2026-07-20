@@ -111,27 +111,20 @@ $query .= " ORDER BY p.created_at DESC";
 $properties = mysqli_query($conn, $query);
 $users_list = mysqli_query($conn, "SELECT id, full_name FROM users ORDER BY full_name");
 
-$stats = [
-    'users' => 0,
-    'pending' => 0,
-    'unread' => 0
-];
-
+// ===== REAL STATS =====
+// Total Users
 $result = mysqli_query($conn, "SELECT COUNT(*) as total FROM users");
-if ($result && mysqli_num_rows($result) > 0) {
-    $stats['users'] = mysqli_fetch_assoc($result)['total'] ?? 0;
-}
+$total_users = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['total'] : 0;
 
+// Pending Properties
 $result = mysqli_query($conn, "SELECT COUNT(*) as total FROM properties WHERE status = 'Pending'");
-if ($result && mysqli_num_rows($result) > 0) {
-    $stats['pending'] = mysqli_fetch_assoc($result)['total'] ?? 0;
-}
+$pending_count = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['total'] : 0;
 
+// Unread Messages
 $result = mysqli_query($conn, "SELECT COUNT(*) as total FROM messages WHERE is_read = 0");
-if ($result && mysqli_num_rows($result) > 0) {
-    $stats['unread'] = mysqli_fetch_assoc($result)['total'] ?? 0;
-}
+$unread_msgs = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['total'] : 0;
 
+// Admin Profile Picture
 $admin_id = $_SESSION['user_id'];
 $profile_pic_path = '';
 $upload_dir = "../uploads/profiles/";
@@ -145,6 +138,7 @@ if (!empty($found)) {
     $profile_pic_path = $found[0] . '?t=' . time();
 }
 
+// Property Counts
 $property_counts = [
     'total' => 0,
     'active' => 0,
@@ -189,7 +183,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
         .dashboard-wrapper { display:flex; min-height:100vh; background:#f4f6f5; }
 
-        /* ===== SIDEBAR - SAME AS SELLER ===== */
+        /* ===== SIDEBAR - SAME AS DASHBOARD ===== */
         .sidebar {
             width: 250px;
             min-width: 250px;
@@ -205,7 +199,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .sidebar::-webkit-scrollbar { width:4px; }
         .sidebar::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:10px; }
 
-        /* ===== LOGO - SAME AS SELLER ===== */
+        /* ===== LOGO ===== */
         .logo {
             padding:0 4px 20px;
             margin-bottom:20px;
@@ -295,18 +289,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             transform:scale(1.1);
         }
 
-        .nav-badge {
-            margin-left: auto;
-            background: #ef4444;
-            color: white;
-            border-radius: 50px;
-            padding: 2px 10px;
-            font-size: 10px;
-            font-weight: 700;
-            min-width: 22px;
-            text-align: center;
-        }
-        .nav-badge.blue { background: #0E7A4E; }
+        /* ===== NO BADGES - REMOVED ALL ===== */
 
         /* ===== LOGOUT LINK ===== */
         .logout-link {
@@ -317,10 +300,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             color:#fff !important;
             box-shadow:0 8px 20px rgba(220,38,38,.35) !important;
         }
-
-        /* ===== MAIN CONTENT ===== */
-        .main-content { flex:1; overflow-y:auto; }
-        .content-inner { padding:28px 32px 40px; }
 
         /* ===== TOP BAR ===== */
         .topbar {
@@ -367,14 +346,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         }
         .icon-btn:hover { background:#e9ecef; }
         .icon-btn svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2; }
-        .icon-btn .count {
-            position:absolute; top:-4px; right:-4px;
-            background:#ef4444; color:#fff;
-            font-size:10px; font-weight:700;
-            min-width:18px; height:18px; border-radius:50%;
-            display:flex; align-items:center; justify-content:center;
-            border:2px solid #fff;
-        }
+        /* .count removed - no badge on bell */
         .user-chip { display:flex; align-items:center; gap:10px; text-decoration:none; }
         .user-avatar {
             width:36px; height:36px; border-radius:10px;
@@ -388,7 +360,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .user-name { font-size:14px; font-weight:700; color:#0b1a2e; }
         .user-role { font-size:12px; color:#6b7a8f; }
 
-        /* ===== CONTENT ===== */
+        /* ===== MAIN CONTENT ===== */
+        .main-content { flex:1; overflow-y:auto; }
+        .content-inner { padding:28px 32px 40px; }
+
+        /* Page Header */
         .page-header {
             margin-bottom:28px;
         }
@@ -403,6 +379,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             margin-top:4px;
         }
 
+        /* Stats Grid */
         .stats-grid {
             display:grid;
             grid-template-columns:repeat(4,1fr);
@@ -412,38 +389,55 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .stat-card {
             background:#fff;
             border-radius:16px;
-            padding:20px;
+            padding:16px;
             border:1px solid #edf2f7;
+            position:relative;
+            overflow:hidden;
             transition:.3s ease;
+            cursor:pointer;
+        }
+        .stat-card::before {
+            content:'';
+            position:absolute;
+            top:0;
+            left:0;
+            width:100%;
+            height:3px;
+            background:#0E7A4E;
         }
         .stat-card:hover {
             transform:translateY(-4px);
-            box-shadow:0 12px 25px rgba(14,122,78,.10);
+            border-color:#0E7A4E;
+            box-shadow:0 12px 25px rgba(14,122,78,.12);
         }
-        .stat-card .number {
-            font-size:28px;
-            font-weight:800;
-            color:#0b1a2e;
-            line-height:1;
+        .stat-icon {
+            width:42px;
+            height:42px;
+            border-radius:12px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            margin-bottom:10px;
+            background:rgba(14,122,78,.10);
+            color:#0E7A4E;
         }
-        .stat-card .label {
-            font-size:13px;
-            color:#64748b;
-            margin-top:6px;
-            font-weight:500;
-        }
-        .stat-card .icon {
-            font-size:20px;
-            margin-bottom:8px;
-            display:inline-block;
-            padding:8px;
-            border-radius:10px;
-        }
-        .stat-card .icon.green { background:#dcfce7; color:#0E7A4E; }
-        .stat-card .icon.blue { background:#dbeafe; color:#2563eb; }
-        .stat-card .icon.amber { background:#fef3c7; color:#d97706; }
-        .stat-card .icon.purple { background:#f3e8ff; color:#8b5cf6; }
+        .stat-icon svg { width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:2; }
+        .stat-number { font-size:26px; font-weight:800; color:#0b1a2e; line-height:1; margin-bottom:6px; }
+        .stat-label { font-size:13px; color:#64748b; margin-bottom:6px; font-weight:500; }
 
+        .alert {
+            padding:14px 20px;
+            border-radius:14px;
+            margin-bottom:20px;
+            font-size:14px;
+            font-weight:600;
+            display:flex;
+            align-items:center;
+            gap:10px;
+        }
+        .alert-success { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
+
+        /* Filter Tabs */
         .filter-tabs {
             display:flex;
             gap:8px;
@@ -469,6 +463,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             border-color:#0E7A4E;
         }
 
+        /* Actions Bar */
         .actions-bar {
             display:flex;
             justify-content:space-between;
@@ -535,6 +530,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         }
         .btn-danger:hover { background:#dc2626; }
 
+        /* Table */
         .table-card {
             background:white;
             border-radius:18px;
@@ -587,6 +583,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .status-badge.Pending { background:#fef3c7; color:#b45309; }
         .status-badge.Sold { background:#dbeafe; color:#2563eb; }
 
+        /* Modal */
         .modal-overlay {
             position:fixed;
             top:0; left:0; right:0; bottom:0;
@@ -657,18 +654,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             border-top:2px solid #edf2f7;
         }
 
-        .alert {
-            padding:14px 20px;
-            border-radius:14px;
-            margin-bottom:20px;
-            font-size:14px;
-            font-weight:600;
-            display:flex;
-            align-items:center;
-            gap:10px;
-        }
-        .alert-success { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
-
         @media (max-width:1100px) {
             .sidebar { position:fixed; left:-280px; transition:left 0.3s; }
             .sidebar.open { left:0; }
@@ -682,13 +667,25 @@ $current_page = basename($_SERVER['PHP_SELF']);
             .stats-grid { grid-template-columns:1fr; }
             .form-row { grid-template-columns:1fr; }
             .topbar-search { max-width:none; }
+            .table-header { display:none; }
+            .table-row { grid-template-columns:1fr; gap:6px; padding:16px; }
+            .table-row > div { padding:4px 0; }
+            .table-row > div:before { 
+                content:attr(data-label);
+                font-size:10px;
+                font-weight:700;
+                color:#94a3b8;
+                display:block;
+                text-transform:uppercase;
+                letter-spacing:0.3px;
+            }
         }
     </style>
 </head>
 <body>
 <div class="dashboard-wrapper">
 
-    <!-- ===== SIDEBAR - SAME AS SELLER ===== -->
+    <!-- ===== SIDEBAR - EXACT SAME AS INDEX.PHP (NO BADGES) ===== -->
     <aside class="sidebar" id="adminSidebar">
         <div class="logo">
             <a href="../index.php">
@@ -715,7 +712,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <path d="M20 21a8 8 0 1 0-16 0"/>
                     </svg>
                     Users
-                    <span class="nav-badge"><?php echo $stats['users']; ?></span>
                 </a>
             </li>
             <li>
@@ -725,9 +721,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <polyline points="9 22 9 12 15 12 15 22"/>
                     </svg>
                     Properties
-                    <?php if ($stats['pending'] > 0): ?>
-                        <span class="nav-badge"><?php echo $stats['pending']; ?></span>
-                    <?php endif; ?>
                 </a>
             </li>
             <li>
@@ -736,9 +729,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                     </svg>
                     Messages
-                    <?php if ($stats['unread'] > 0): ?>
-                        <span class="nav-badge blue"><?php echo $stats['unread']; ?></span>
-                    <?php endif; ?>
                 </a>
             </li>
         </ul>
@@ -766,6 +756,23 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </a>
             </li>
             <li>
+                <a href="profile.php" class="<?php echo ($current_page == 'profile.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="8" r="4"/>
+                        <path d="M5 20v-2a7 7 0 0 1 14 0v2"/>
+                    </svg>
+                    Profile
+                </a>
+            </li>
+            <li>
+                <a href="notifications.php" class="<?php echo ($current_page == 'notifications.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
+                    Notifications
+                </a>
+            </li>
+            <li>
                 <a href="../logout.php" class="logout-link">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -781,7 +788,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- ===== MAIN CONTENT ===== -->
     <div class="main-content">
 
-        <!-- TOP BAR -->
+        <!-- TOP BAR - NO BADGE ON BELL -->
         <header class="topbar">
             <button class="topbar-menu-btn" onclick="document.getElementById('adminSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -793,9 +800,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
             </div>
 
             <div class="topbar-actions">
-                <button class="icon-btn" title="Notifications">
+                <button class="icon-btn" title="Notifications" onclick="window.location.href='notifications.php'">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                    <span class="count">3</span>
                 </button>
                 <a href="profile.php" class="user-chip">
                     <div class="user-avatar">
@@ -815,11 +821,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
         <div class="content-inner">
 
-            <!-- Page Header -->
-            <div class="page-header">
-                <h1>Property Management</h1>
-                <p>Manage all property listings, approve pending properties and track sales</p>
-            </div>
+        
 
             <?php if ($message): ?>
                 <div class="alert alert-success">
@@ -829,25 +831,33 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
             <!-- Stats -->
             <div class="stats-grid">
-                <div class="stat-card">
-                    <span class="icon green"><i class="fas fa-home"></i></span>
-                    <div class="number"><?php echo $property_counts['total']; ?></div>
-                    <div class="label">Total Properties</div>
+                <div class="stat-card" onclick="window.location.href='manage-properties.php?filter=all'">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    </div>
+                    <div class="stat-number"><?php echo $property_counts['total']; ?></div>
+                    <div class="stat-label">Total Properties</div>
                 </div>
-                <div class="stat-card">
-                    <span class="icon green"><i class="fas fa-check-circle"></i></span>
-                    <div class="number"><?php echo $property_counts['active']; ?></div>
-                    <div class="label">Active Listings</div>
+                <div class="stat-card" onclick="window.location.href='manage-properties.php?filter=Active'">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <div class="stat-number"><?php echo $property_counts['active']; ?></div>
+                    <div class="stat-label">Active Listings</div>
                 </div>
-                <div class="stat-card">
-                    <span class="icon amber"><i class="fas fa-clock"></i></span>
-                    <div class="number"><?php echo $property_counts['pending']; ?></div>
-                    <div class="label">Pending Approval</div>
+                <div class="stat-card" onclick="window.location.href='manage-properties.php?filter=Pending'">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="stat-number"><?php echo $property_counts['pending']; ?></div>
+                    <div class="stat-label">Pending Approval</div>
                 </div>
-                <div class="stat-card">
-                    <span class="icon purple"><i class="fas fa-check-double"></i></span>
-                    <div class="number"><?php echo $property_counts['sold']; ?></div>
-                    <div class="label">Sold Properties</div>
+                <div class="stat-card" onclick="window.location.href='manage-properties.php?filter=Sold'">
+                    <div class="stat-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <div class="stat-number"><?php echo $property_counts['sold']; ?></div>
+                    <div class="stat-label">Sold Properties</div>
                 </div>
             </div>
 
@@ -886,19 +896,19 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <?php if ($properties && mysqli_num_rows($properties) > 0): ?>
                     <?php while ($prop = mysqli_fetch_assoc($properties)): ?>
                         <div class="table-row">
-                            <div class="prop-info">
+                            <div class="prop-info" data-label="Property">
                                 <h4><?php echo htmlspecialchars($prop['title']); ?></h4>
                                 <span><?php echo htmlspecialchars($prop['location']); ?></span>
                             </div>
-                            <div style="font-weight:700;">PKR <?php echo number_format($prop['price'] / 1000000, 1); ?>M</div>
-                            <div><?php echo htmlspecialchars($prop['property_type']); ?></div>
-                            <div>
+                            <div data-label="Price" style="font-weight:700;">PKR <?php echo number_format($prop['price'] / 1000000, 1); ?>M</div>
+                            <div data-label="Type"><?php echo htmlspecialchars($prop['property_type']); ?></div>
+                            <div data-label="Status">
                                 <span class="status-badge <?php echo $prop['status']; ?>">
                                     <?php echo $prop['status']; ?>
                                 </span>
                             </div>
-                            <div style="font-size:13px;"><?php echo htmlspecialchars($prop['owner']); ?></div>
-                            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <div data-label="Owner" style="font-size:13px;"><?php echo htmlspecialchars($prop['owner']); ?></div>
+                            <div data-label="Actions" style="display:flex; gap:6px; flex-wrap:wrap;">
                                 <?php if ($prop['status'] == 'Pending'): ?>
                                     <a href="?approve=<?php echo $prop['id']; ?>" class="btn btn-success btn-sm">
                                         <i class="fas fa-check"></i> Approve
@@ -985,7 +995,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <label>Owner</label>
                 <select name="user_id">
                     <?php 
-                    // Reset the users_list pointer since we already used it for the dropdown
+                    // Reset the users_list pointer
                     $users_list = mysqli_query($conn, "SELECT id, full_name FROM users ORDER BY full_name");
                     while ($u = mysqli_fetch_assoc($users_list)): ?>
                         <option value="<?php echo $u['id']; ?>"><?php echo htmlspecialchars($u['full_name']); ?></option>
@@ -1063,10 +1073,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <script>
 function openModal(id) {
     document.getElementById(id).classList.add('active');
+    document.body.style.overflow = 'hidden';
 }
 
 function closeModal(id) {
     document.getElementById(id).classList.remove('active');
+    document.body.style.overflow = '';
 }
 
 function editProperty(id, title, price, type, status, location) {
@@ -1081,8 +1093,21 @@ function editProperty(id, title, price, type, status, location) {
 
 document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
     overlay.addEventListener('click', function(e) {
-        if (e.target === this) this.classList.remove('active');
+        if (e.target === this) {
+            this.classList.remove('active');
+            document.body.style.overflow = '';
+        }
     });
+});
+
+// Search functionality for topbar
+document.querySelector('.topbar-search input').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        const query = this.value.trim();
+        if (query) {
+            window.location.href = 'search.php?q=' + encodeURIComponent(query);
+        }
+    }
 });
 </script>
 

@@ -122,7 +122,7 @@ if ($selected_sender_id && $selected_property_id) {
 }
 
 // ================================================================
-// SIDEBAR STATS (for total users, pending, etc.)
+// SIDEBAR STATS (for total users, pending, etc.) - NOT USED FOR BADGES
 // ================================================================
 $stats = [
     'users' => 0,
@@ -136,8 +136,8 @@ if ($result) $stats['users'] = (int)mysqli_fetch_assoc($result)['total'];
 $result = mysqli_query($conn, "SELECT COUNT(*) as total FROM properties WHERE status = 'Pending'");
 if ($result) $stats['pending'] = (int)mysqli_fetch_assoc($result)['total'];
 
-// For sidebar Messages badge, we'll use unread_conversations (not total unread messages)
-$stats['unread'] = $unread_conversations;
+$result = mysqli_query($conn, "SELECT COUNT(*) as total FROM messages WHERE is_read = 0");
+if ($result) $stats['unread'] = (int)mysqli_fetch_assoc($result)['total'];
 
 $page_title = 'Messages';
 $current_page = basename($_SERVER['PHP_SELF']);
@@ -270,18 +270,7 @@ if (!empty($found)) {
             transform:scale(1.1);
         }
 
-        .nav-badge {
-            margin-left: auto;
-            background: #ef4444;
-            color: white;
-            border-radius: 50px;
-            padding: 2px 10px;
-            font-size: 10px;
-            font-weight: 700;
-            min-width: 22px;
-            text-align: center;
-        }
-        .nav-badge.blue { background: #0E7A4E; }
+        /* ===== NO BADGES - REMOVED ===== */
 
         .logout-link {
             color:#b8c2cc !important;
@@ -321,7 +310,23 @@ if (!empty($found)) {
         .topbar-search svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:#adb5bd; }
 
         .topbar-actions { display:flex; align-items:center; gap:16px; }
-        /* Removed notification bell icon */
+        .icon-btn {
+            position: relative;
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: #f8fafc;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition:0.2s;
+            color:#1e293b;
+        }
+        .icon-btn:hover { background:#e9ecef; }
+        .icon-btn svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2; }
+        /* .count removed - no badge on bell */
         .user-chip { display:flex; align-items:center; gap:10px; text-decoration:none; }
         .user-avatar {
             width:36px; height:36px; border-radius:10px;
@@ -783,7 +788,7 @@ if (!empty($found)) {
 <body>
 <div class="dashboard-wrapper">
 
-    <!-- ===== SIDEBAR (ADMIN) ===== -->
+    <!-- ===== SIDEBAR - EXACTLY AS INDEX.PHP (with Profile & Notifications) ===== -->
     <aside class="sidebar" id="adminSidebar">
         <div class="logo">
             <a href="../index.php">
@@ -810,7 +815,6 @@ if (!empty($found)) {
                         <path d="M20 21a8 8 0 1 0-16 0"/>
                     </svg>
                     Users
-                    <span class="nav-badge"><?php echo $stats['users']; ?></span>
                 </a>
             </li>
             <li>
@@ -820,9 +824,6 @@ if (!empty($found)) {
                         <polyline points="9 22 9 12 15 12 15 22"/>
                     </svg>
                     Properties
-                    <?php if ($stats['pending'] > 0): ?>
-                        <span class="nav-badge"><?php echo $stats['pending']; ?></span>
-                    <?php endif; ?>
                 </a>
             </li>
             <li>
@@ -831,9 +832,6 @@ if (!empty($found)) {
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                     </svg>
                     Messages
-                    <?php if ($stats['unread'] > 0): ?>
-                        <span class="nav-badge blue"><?php echo $stats['unread']; ?></span>
-                    <?php endif; ?>
                 </a>
             </li>
         </ul>
@@ -861,6 +859,23 @@ if (!empty($found)) {
                 </a>
             </li>
             <li>
+                <a href="profile.php" class="<?php echo ($current_page == 'profile.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="8" r="4"/>
+                        <path d="M5 20v-2a7 7 0 0 1 14 0v2"/>
+                    </svg>
+                    Profile
+                </a>
+            </li>
+            <li>
+                <a href="notifications.php" class="<?php echo ($current_page == 'notifications.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
+                    Notifications
+                </a>
+            </li>
+            <li>
                 <a href="../logout.php" class="logout-link">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -876,7 +891,7 @@ if (!empty($found)) {
     <!-- ===== MAIN CONTENT ===== -->
     <div class="main-content">
 
-        <!-- TOP BAR (notification bell removed) -->
+        <!-- TOP BAR (with notification bell, no badge) -->
         <header class="topbar">
             <button class="topbar-menu-btn" onclick="document.getElementById('adminSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -888,7 +903,11 @@ if (!empty($found)) {
             </div>
 
             <div class="topbar-actions">
-                <!-- Notification bell removed -->
+                <!-- Notification bell (no count) -->
+                <button class="icon-btn" title="Notifications" onclick="window.location.href='notifications.php'">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                </button>
+
                 <a href="profile.php" class="user-chip">
                     <div class="user-avatar">
                         <?php if (!empty($profile_pic_path)): ?>
