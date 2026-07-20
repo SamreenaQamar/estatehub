@@ -518,6 +518,7 @@ ALTER TABLE users MODIFY status ENUM('active','pending','blocked','deleted') NOT
 ALTER TABLE users ADD INDEX idx_status (status);
 ALTER TABLE users ADD INDEX idx_user_type (user_type);
 
+
 -- =============================================
 -- END OF DATABASE SQL FILE
 -- =============================================

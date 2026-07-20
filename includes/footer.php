@@ -79,7 +79,7 @@
 
     <!-- Bottom -->
     <div class="footer-bottom">
-      <p>© <?php echo date('Y'); ?> EstateHub. All Rights Reserved.     ❤️Meraj Ahmad❤️ </p>
+      <p>© <?php echo date('Y'); ?> EstateHub. All Rights Reserved.</p>
 
       <div class="payments">
         <img src="https://cdn-icons-png.flaticon.com/512/196/196578.png" alt="Visa">
