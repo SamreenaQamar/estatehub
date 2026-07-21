@@ -38,8 +38,49 @@ if (!$user_check || mysqli_num_rows($user_check) == 0) {
 }
 
 // ------------------------------------------------------------------
-// MAIN PATH: heart icon AJAX toggle by property_title
+// MAIN PATH (PREFERRED): heart icon AJAX toggle by property_id
+// ID hamesha unique hoti hai, isliye ye 100% sahi property match karta
+// hai — chahe do properties ka naam (title) same kyun na ho.
 // (used on index.php, listings.php, wishlist.php)
+// ------------------------------------------------------------------
+if (isset($_POST['property_id'])) {
+    $property_id = (int) $_POST['property_id'];
+
+    if ($property_id <= 0) {
+        respond($is_ajax, 'error', 'Invalid property.', $fallback_redirect);
+    }
+
+    $prop_result = mysqli_query($conn, "SELECT id FROM properties WHERE id = $property_id LIMIT 1");
+    if (!$prop_result || mysqli_num_rows($prop_result) == 0) {
+        respond($is_ajax, 'error', 'Property not found!', $fallback_redirect);
+    }
+
+    $check = mysqli_query($conn, "SELECT id FROM wishlist WHERE user_id = $user_id AND property_id = $property_id");
+
+    if ($check && mysqli_num_rows($check) > 0) {
+        // Already wishlisted -> remove it (toggle off)
+        $delete = mysqli_query($conn, "DELETE FROM wishlist WHERE user_id = $user_id AND property_id = $property_id");
+        if ($delete) {
+            respond($is_ajax, 'removed', 'Removed from wishlist', $fallback_redirect);
+        } else {
+            respond($is_ajax, 'error', 'Database error: ' . mysqli_error($conn), $fallback_redirect);
+        }
+    } else {
+        // Not wishlisted yet -> add it (toggle on)
+        $insert = mysqli_query($conn, "INSERT INTO wishlist (user_id, property_id, created_at) VALUES ($user_id, $property_id, NOW())");
+        if ($insert) {
+            respond($is_ajax, 'added', 'Added to wishlist ❤️', $fallback_redirect);
+        } else {
+            respond($is_ajax, 'error', 'Database error: ' . mysqli_error($conn), $fallback_redirect);
+        }
+    }
+}
+
+// ------------------------------------------------------------------
+// LEGACY PATH: title-based (backward compatibility only — koi bhi
+// naya code isko use nahi karta. Duplicate titles ki wajah se ye
+// galat property match kar sakta hai, isiliye upar wala property_id
+// path hi hamesha use karein).
 // ------------------------------------------------------------------
 if (isset($_POST['property_title'])) {
     $title = mysqli_real_escape_string($conn, trim($_POST['property_title']));
@@ -58,7 +99,6 @@ if (isset($_POST['property_title'])) {
     $check = mysqli_query($conn, "SELECT id FROM wishlist WHERE user_id = $user_id AND property_id = $property_id");
 
     if ($check && mysqli_num_rows($check) > 0) {
-        // Already wishlisted -> remove it (toggle off)
         $delete = mysqli_query($conn, "DELETE FROM wishlist WHERE user_id = $user_id AND property_id = $property_id");
         if ($delete) {
             respond($is_ajax, 'removed', 'Removed from wishlist', $fallback_redirect);
@@ -66,7 +106,6 @@ if (isset($_POST['property_title'])) {
             respond($is_ajax, 'error', 'Database error: ' . mysqli_error($conn), $fallback_redirect);
         }
     } else {
-        // Not wishlisted yet -> add it (toggle on)
         $insert = mysqli_query($conn, "INSERT INTO wishlist (user_id, property_id, created_at) VALUES ($user_id, $property_id, NOW())");
         if ($insert) {
             respond($is_ajax, 'added', 'Added to wishlist ❤️', $fallback_redirect);

@@ -374,7 +374,7 @@ body { background: #F8FAFC; }
                             <div class="featured-badge">Featured</div>
                         <?php endif; ?>
 
-                        <a href="javascript:void(0)" class="wishlist-icon active" data-title="<?php echo htmlspecialchars($prop['title']); ?>" onclick="toggleWishlistHome(this)" title="Remove from wishlist">
+                        <a href="javascript:void(0)" class="wishlist-icon active" data-id="<?php echo (int) $prop['property_id']; ?>" onclick="toggleWishlistHome(this)" title="Remove from wishlist">
                             <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
                                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                             </svg>
@@ -493,9 +493,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ============================================ //
 // WISHLIST TOGGLE (heart icon) - AJAX          //
-// Same endpoint/behaviour as home page, but    //
-// on this page a successful "removed" fades    //
-// the card out and removes it from the grid.   //
+// ID-based (unique) — same endpoint/behaviour  //
+// as home/listings page, but on this page a    //
+// successful "removed" fades the card out and  //
+// removes it from the grid.                    //
 // ============================================ //
 function showWishlistToast(message, isError) {
     let toast = document.getElementById('wishlistToast');
@@ -525,13 +526,13 @@ function updateWishlistCountBadge(delta) {
 }
 
 function toggleWishlistHome(el) {
-    const title = el.getAttribute('data-title');
+    const propertyId = el.getAttribute('data-id');
     const card = el.closest('.property-card');
 
     fetch('toggle-wishlist.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
-        body: 'ajax=1&property_title=' + encodeURIComponent(title)
+        body: 'ajax=1&property_id=' + encodeURIComponent(propertyId)
     })
     .then(res => res.json())
     .then(data => {

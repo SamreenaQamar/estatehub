@@ -3,16 +3,49 @@ $page_title = 'Home';
 require_once __DIR__ . '/includes/config.php';
 include 'includes/header.php';
 
-$wishlisted_titles = [];
+$wishlisted_ids = [];
 if (isset($_SESSION['user_id'])) {
     $wl_user_id = (int) $_SESSION['user_id'];
-    $wl_query = mysqli_query($conn, "SELECT p.title FROM wishlist w INNER JOIN properties p ON w.property_id = p.id WHERE w.user_id = $wl_user_id");
+    $wl_query = mysqli_query($conn, "SELECT property_id FROM wishlist WHERE user_id = $wl_user_id");
     if ($wl_query) {
         while ($wl_row = mysqli_fetch_assoc($wl_query)) {
-            $wishlisted_titles[] = $wl_row['title'];
+            $wishlisted_ids[] = (int) $wl_row['property_id'];
         }
     }
 }
+
+// ============================================
+// SAME FUNCTION AS listings.php / wishlist.php
+// (isi wajah se image bilkul same rahegi wishlist mein)
+// ============================================
+function getPropertyImages($type, $id)
+{
+    switch (strtolower(trim($type))) {
+        case 'house':        $folder = 'house'; break;
+        case 'apartment':    $folder = 'apartment'; break;
+        case 'plot':         $folder = 'plot'; break;
+        case 'commercial':   $folder = 'commercial'; break;
+        case 'farm house':   $folder = 'farmhouse'; break;
+        case 'villa':        $folder = 'villa'; break;
+        case 'penthouse':    $folder = 'penthouse'; break;
+        case 'portion':      $folder = 'portion'; break;
+        default:             $folder = 'house'; break;
+    }
+
+    $images = [];
+    $start = ($id % 10) + 1;
+    for ($i = 0; $i < 4; $i++) {
+        $num = (($start + $i - 1) % 10) + 1;
+        $images[] = "assets/images/$folder/$num.jpg";
+    }
+    return $images;
+}
+
+// ============================================
+// REAL PROPERTIES FROM DATABASE (dummy/demo cards ki jagah)
+// ============================================
+$featured_query  = "SELECT * FROM properties WHERE status = 'Active' ORDER BY featured DESC, created_at DESC LIMIT 6";
+$featured_result = mysqli_query($conn, $featured_query);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -228,7 +261,6 @@ select {
 
 .search-btn svg {
     stroke: white;
-    width: 18px;
 }
 
 /*=========================================
@@ -635,6 +667,7 @@ justify-content: center;
     border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    position: relative;
 }
 .premium-card:hover {
     transform: translateY(-6px);
@@ -643,9 +676,111 @@ justify-content: center;
 .premium-card .card-image-slider {
     border-radius: 16px 16px 0 0;
     overflow: hidden;
+    position: relative;
+    height: 200px;
+    background: #f3f4f6;
 }
+.card-image-slider .slider-container { width: 100%; height: 100%; overflow: hidden; }
+.card-image-slider .slider-track { display: flex; height: 100%; transition: transform 0.5s ease; }
+.card-image-slider .slider-track img { width: 100%; height: 100%; object-fit: cover; flex-shrink: 0; }
+.slider-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255,255,255,0.7);
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+    cursor: pointer;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 3;
+}
+.premium-card:hover .slider-btn { opacity: 1; pointer-events: auto; }
+.slider-btn:hover { background: white; }
+.slider-prev { left: 8px; }
+.slider-next { right: 8px; }
+.slider-dots {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 5px;
+    z-index: 3;
+}
+.slider-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.5); cursor: pointer; transition: 0.2s; }
+.slider-dot.active { background: white; width: 16px; border-radius: 4px; }
+
+.card-tag {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 4px 14px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: white;
+    z-index: 4;
+}
+.card-tag.for-sale { background: #0E7A4E; }
+.card-tag.for-rent { background: #10B981; }
+
+.featured-badge {
+    position: absolute;
+    top: 12px;
+    left: 90px;
+    background: #F59E0B;
+    color: white;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    z-index: 4;
+}
+
+.wishlist-icon {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.2s;
+    z-index: 4;
+}
+.wishlist-icon:hover { background: rgba(0,0,0,0.6); }
+.wishlist-icon svg { width: 18px; height: 18px; stroke: white; fill: none; }
+.wishlist-icon.active svg { fill: #ef4444; stroke: #ef4444; }
+
 .premium-card .card-body {
     padding: 20px 20px 18px;
+}
+.card-location {
+    font-size: 12px;
+    color: #6B7280;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.card-location svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    flex-shrink: 0;
 }
 .premium-card .card-price {
     font-size: 24px;
@@ -657,6 +792,11 @@ justify-content: center;
     font-size: 14px;
     font-weight: 600;
     color: #64748b;
+}
+.contact-price {
+    font-size: 16px;
+    font-weight: 700;
+    color: #ef4444;
 }
 .premium-card .card-meta {
     display: flex;
@@ -1185,249 +1325,80 @@ justify-content: center;
                         View All <i class="fas fa-arrow-right"></i>
                     </a>
                 </div>
-                
-                <div class="properties-grid">
-                    
-                  <!-- ========================================================== -->
-                  <!-- 1. MODERN 10 MARLA HOUSE (For Sale) – PKR 1.5M              -->
-                  <!-- ========================================================== -->
-                  <div class="property-card premium-card">
-                      <div class="card-image-slider" id="slider1">
-                          <div class="slider-container">
-                              <div class="slider-track">
-                                  <img src="https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg" alt="Modern House" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/1396132/pexels-photo-1396132.jpeg" alt="Kitchen" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg" alt="Bedroom" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/1571459/pexels-photo-1571459.jpeg" alt="Living Room" loading="lazy">
-                              </div>
-                          </div>
-                          <button class="slider-btn slider-prev" onclick="prevSlide('slider1')">‹</button>
-                          <button class="slider-btn slider-next" onclick="nextSlide('slider1')">›</button>
-                          <div class="slider-dots" id="dots1"></div>
-                      </div>
-                      <div class="card-tag for-sale">For Sale</div>
-                      <div class="featured-badge">Featured</div>
-                      <a href="javascript:void(0)" class="wishlist-icon" data-title="Modern 10 Marla House" onclick="toggleWishlistHome(this)" title="Add to wishlist">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                          </svg>
-                      </a>
-                      <div class="card-body">
-                          <h3>Modern 10 Marla House</h3>
-                          <div class="card-location">
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                                  <circle cx="12" cy="10" r="3"/>
-                              </svg>
-                              DHA Phase 6, Lahore
-                          </div>
-                          <div class="card-price">PKR 1.5M</div>
-                          <div class="card-meta">
-                              <span class="meta-item"><i class="fas fa-bed"></i> 5 Beds</span>
-                              <span class="meta-item"><i class="fas fa-bath"></i> 6 Baths</span>
-                              <span class="meta-item"><i class="fas fa-vector-square"></i> 10 Marla</span>
-                              <span class="meta-item"><i class="fas fa-building"></i> House</span>
-                              <span class="meta-item"><i class="fas fa-couch"></i> Furnished</span>
-                          </div>
-                          <a href="property-detail.php?id=1" class="view-detail-btn">View Details</a>
-                      </div>
-                  </div>
 
-                  <!-- ========================================================== -->
-                  <!-- 2. DESIGNER VILLA (For Sale) – PKR 2.8M                     -->
-                  <!-- ========================================================== -->
-                  <div class="property-card premium-card">
-                      <div class="card-image-slider" id="slider2">
-                          <div class="slider-container">
-                              <div class="slider-track">
-                                  <img src="https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg" alt="Villa" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/1396132/pexels-photo-1396132.jpeg" alt="Kitchen" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg" alt="Bedroom" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/1571458/pexels-photo-1571458.jpeg" alt="Living" loading="lazy">
-                              </div>
-                          </div>
-                          <button class="slider-btn slider-prev" onclick="prevSlide('slider2')">‹</button>
-                          <button class="slider-btn slider-next" onclick="nextSlide('slider2')">›</button>
-                          <div class="slider-dots" id="dots2"></div>
-                      </div>
-                      <div class="card-tag for-sale">For Sale</div>
-                      <div class="featured-badge">Premium</div>
-                      <a href="javascript:void(0)" class="wishlist-icon" data-title="Designer Villa" onclick="toggleWishlistHome(this)" title="Add to wishlist">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                          </svg>
-                      </a>
-                      <div class="card-body">
-                          <h3>Designer Villa</h3>
-                          <div class="card-location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>F-10, Islamabad</div>
-                          <div class="card-price">PKR 2.8M</div>
-                          <div class="card-meta">
-                              <span class="meta-item"><i class="fas fa-bed"></i> 6 Beds</span>
-                              <span class="meta-item"><i class="fas fa-bath"></i> 7 Baths</span>
-                              <span class="meta-item"><i class="fas fa-vector-square"></i> 1 Kanal</span>
-                              <span class="meta-item"><i class="fas fa-building"></i> Villa</span>
-                              <span class="meta-item"><i class="fas fa-gem"></i> Luxury</span>
-                          </div>
-                          <a href="property-detail.php?id=2" class="view-detail-btn">View Details</a>
-                      </div>
-                  </div>
+                <div class="properties-grid" id="featuredGrid">
+                    <?php if ($featured_result && mysqli_num_rows($featured_result) > 0): ?>
+                        <?php while ($prop = mysqli_fetch_assoc($featured_result)):
+                            $images = getPropertyImages($prop['property_type'], $prop['id']);
+                            $is_wishlisted = in_array((int) $prop['id'], $wishlisted_ids);
+                            $price_formatted = number_format($prop['price'] / 1000000, 1);
+                            $price_display = $prop['price'] > 0 ? 'PKR ' . $price_formatted . 'M' : '<span class="contact-price">Contact for Price</span>';
+                            $price_suffix = ($prop['purpose'] == 'Rent' && $prop['price'] > 0) ? ' <span class="per-month">/ Month</span>' : '';
+                        ?>
+                        <div class="property-card premium-card" data-property-id="<?php echo $prop['id']; ?>">
+                            <div class="card-image-slider" id="slider_<?php echo $prop['id']; ?>">
+                                <div class="slider-container">
+                                    <div class="slider-track">
+                                        <?php foreach ($images as $img): ?>
+                                            <img src="<?php echo htmlspecialchars($img); ?>"
+                                                 alt="<?php echo htmlspecialchars($prop['title']); ?>"
+                                                 loading="lazy"
+                                                 onerror="this.src='assets/images/house/1.jpg';">
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                                <button class="slider-btn slider-prev" onclick="prevSlide('slider_<?php echo $prop['id']; ?>')">‹</button>
+                                <button class="slider-btn slider-next" onclick="nextSlide('slider_<?php echo $prop['id']; ?>')">›</button>
+                                <div class="slider-dots" id="dots_<?php echo $prop['id']; ?>"></div>
+                            </div>
 
-                  <!-- ========================================================== -->
-                  <!-- 3. HAYATABAD PHASE 5 HOUSE (For Sale) – PKR 4.2M             -->
-                  <!-- ========================================================== -->
-                  <div class="property-card premium-card">
-                      <div class="card-image-slider" id="slider3">
-                          <div class="slider-container">
-                              <div class="slider-track">
-                                  <img src="https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg" alt="House" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/323781/pexels-photo-323781.jpeg" alt="Living" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/323782/pexels-photo-323782.jpeg" alt="Bedroom" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/323783/pexels-photo-323783.jpeg" alt="Kitchen" loading="lazy">
-                              </div>
-                          </div>
-                          <button class="slider-btn slider-prev" onclick="prevSlide('slider3')">‹</button>
-                          <button class="slider-btn slider-next" onclick="nextSlide('slider3')">›</button>
-                          <div class="slider-dots" id="dots3"></div>
-                      </div>
-                      <div class="card-tag for-sale">For Sale</div>
-                      <div class="featured-badge">Hot Deal</div>
-                      <a href="javascript:void(0)" class="wishlist-icon" data-title="Hayatabad Phase 5 House" onclick="toggleWishlistHome(this)" title="Add to wishlist">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                          </svg>
-                      </a>
-                      <div class="card-body">
-                          <h3>Hayatabad Phase 5 House</h3>
-                          <div class="card-location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Hayatabad, Peshawar</div>
-                          <div class="card-price">PKR 4.2M</div>
-                          <div class="card-meta">
-                              <span class="meta-item"><i class="fas fa-bed"></i> 5 Beds</span>
-                              <span class="meta-item"><i class="fas fa-bath"></i> 5 Baths</span>
-                              <span class="meta-item"><i class="fas fa-vector-square"></i> 1 Kanal</span>
-                              <span class="meta-item"><i class="fas fa-building"></i> House</span>
-                              <span class="meta-item"><i class="fas fa-shield-alt"></i> Gated</span>
-                          </div>
-                          <a href="property-detail.php?id=3" class="view-detail-btn">View Details</a>
-                      </div>
-                  </div>
+                            <div class="card-tag <?php echo $prop['purpose'] == 'Rent' ? 'for-rent' : 'for-sale'; ?>">
+                                <?php echo $prop['purpose'] == 'Rent' ? 'For Rent' : 'For Sale'; ?>
+                            </div>
+                            <?php if (!empty($prop['featured'])): ?>
+                                <div class="featured-badge">Featured</div>
+                            <?php endif; ?>
 
-                  <!-- ========================================================== -->
-                  <!-- 4. LUXURY APARTMENT (For Rent) – PKR 1.2M / Month           -->
-                  <!-- ========================================================== -->
-                  <div class="property-card premium-card">
-                      <div class="card-image-slider" id="slider4">
-                          <div class="slider-container">
-                              <div class="slider-track">
-                                  <img src="https://images.pexels.com/photos/2587054/pexels-photo-2587054.jpeg" alt="Apartment" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/2587056/pexels-photo-2587056.jpeg" alt="Living" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/2587052/pexels-photo-2587052.jpeg" alt="Bedroom" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/2587058/pexels-photo-2587058.jpeg" alt="Kitchen" loading="lazy">
-                              </div>
-                          </div>
-                          <button class="slider-btn slider-prev" onclick="prevSlide('slider4')">‹</button>
-                          <button class="slider-btn slider-next" onclick="nextSlide('slider4')">›</button>
-                          <div class="slider-dots" id="dots4"></div>
-                      </div>
-                      <div class="card-tag for-rent">For Rent</div>
-                      <div class="featured-badge">Premium</div>
-                      <a href="javascript:void(0)" class="wishlist-icon" data-title="Luxury Apartment" onclick="toggleWishlistHome(this)" title="Add to wishlist">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                          </svg>
-                      </a>
-                      <div class="card-body">
-                          <h3>Luxury Apartment</h3>
-                          <div class="card-location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Bahria Town, Karachi</div>
-                          <div class="card-price">PKR 1.2M <span class="per-month">/ Month</span></div>
-                          <div class="card-meta">
-                              <span class="meta-item"><i class="fas fa-bed"></i> 3 Beds</span>
-                              <span class="meta-item"><i class="fas fa-bath"></i> 3 Baths</span>
-                              <span class="meta-item"><i class="fas fa-vector-square"></i> 2000 Sqft</span>
-                              <span class="meta-item"><i class="fas fa-building"></i> Apartment</span>
-                              <span class="meta-item"><i class="fas fa-couch"></i> Furnished</span>
-                          </div>
-                          <a href="property-detail.php?id=4" class="view-detail-btn">View Details</a>
-                      </div>
-                  </div>
+                            <a href="javascript:void(0)" class="wishlist-icon <?php echo $is_wishlisted ? 'active' : ''; ?>"
+                               data-id="<?php echo (int) $prop['id']; ?>"
+                               onclick="toggleWishlistHome(this)" title="Add to wishlist">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                                </svg>
+                            </a>
 
-                  <!-- ========================================================== -->
-                  <!-- 5. LUXURY PENTHOUSE (For Rent) – PKR 2.5M / Month           -->
-                  <!-- ========================================================== -->
-                  <div class="property-card premium-card">
-                      <div class="card-image-slider" id="slider5">
-                          <div class="slider-container">
-                              <div class="slider-track">
-                                  <img src="https://images.pexels.com/photos/258154/pexels-photo-258154.jpeg" alt="Penthouse" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/258158/pexels-photo-258158.jpeg" alt="Living" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/258159/pexels-photo-258159.jpeg" alt="Bedroom" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/258160/pexels-photo-258160.jpeg" alt="Bathroom" loading="lazy">
-                              </div>
-                          </div>
-                          <button class="slider-btn slider-prev" onclick="prevSlide('slider5')">‹</button>
-                          <button class="slider-btn slider-next" onclick="nextSlide('slider5')">›</button>
-                          <div class="slider-dots" id="dots5"></div>
-                      </div>
-                      <div class="card-tag for-rent">For Rent</div>
-                      <div class="featured-badge">Hot Deal</div>
-                      <a href="javascript:void(0)" class="wishlist-icon" data-title="Luxury Penthouse" onclick="toggleWishlistHome(this)" title="Add to wishlist">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                          </svg>
-                      </a>
-                      <div class="card-body">
-                          <h3>Luxury Penthouse</h3>
-                          <div class="card-location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Clifton, Karachi</div>
-                          <div class="card-price">PKR 2.5M <span class="per-month">/ Month</span></div>
-                          <div class="card-meta">
-                              <span class="meta-item"><i class="fas fa-bed"></i> 4 Beds</span>
-                              <span class="meta-item"><i class="fas fa-bath"></i> 5 Baths</span>
-                              <span class="meta-item"><i class="fas fa-vector-square"></i> 3500 Sqft</span>
-                              <span class="meta-item"><i class="fas fa-building"></i> Penthouse</span>
-                              <span class="meta-item"><i class="fas fa-water"></i> Sea View</span>
-                          </div>
-                          <a href="property-detail.php?id=5" class="view-detail-btn">View Details</a>
-                      </div>
-                  </div>
-
-                  <!-- ========================================================== -->
-                  <!-- 6. COZY STUDIO APARTMENT (For Rent) – PKR 450K / Month      -->
-                  <!-- ========================================================== -->
-                  <div class="property-card premium-card">
-                      <div class="card-image-slider" id="slider6">
-                          <div class="slider-container">
-                              <div class="slider-track">
-                                  <img src="https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg" alt="Studio" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/1643384/pexels-photo-1643384.jpeg" alt="Living" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/1643385/pexels-photo-1643385.jpeg" alt="Bedroom" loading="lazy">
-                                  <img src="https://images.pexels.com/photos/1643386/pexels-photo-1643386.jpeg" alt="Kitchen" loading="lazy">
-                              </div>
-                          </div>
-                          <button class="slider-btn slider-prev" onclick="prevSlide('slider6')">‹</button>
-                          <button class="slider-btn slider-next" onclick="nextSlide('slider6')">›</button>
-                          <div class="slider-dots" id="dots6"></div>
-                      </div>
-                      <div class="card-tag for-rent">For Rent</div>
-                      <div class="featured-badge">Featured</div>
-                      <a href="javascript:void(0)" class="wishlist-icon" data-title="Cozy Studio Apartment" onclick="toggleWishlistHome(this)" title="Add to wishlist">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                          </svg>
-                      </a>
-                      <div class="card-body">
-                          <h3>Cozy Studio Apartment</h3>
-                          <div class="card-location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Gulberg, Lahore</div>
-                          <div class="card-price">PKR 450K <span class="per-month">/ Month</span></div>
-                          <div class="card-meta">
-                              <span class="meta-item"><i class="fas fa-bed"></i> 2 Beds</span>
-                              <span class="meta-item"><i class="fas fa-bath"></i> 2 Baths</span>
-                              <span class="meta-item"><i class="fas fa-vector-square"></i> 1200 Sqft</span>
-                              <span class="meta-item"><i class="fas fa-building"></i> Studio</span>
-                              <span class="meta-item"><i class="fas fa-couch"></i> Fully Furnished</span>
-                          </div>
-                          <a href="property-detail.php?id=6" class="view-detail-btn">View Details</a>
-                      </div>
-                  </div>
-
+                            <div class="card-body">
+                                <h3><?php echo htmlspecialchars($prop['title']); ?></h3>
+                                <div class="card-location">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                                        <circle cx="12" cy="10" r="3"/>
+                                    </svg>
+                                    <?php echo htmlspecialchars($prop['location']); ?>, <?php echo htmlspecialchars($prop['city']); ?>
+                                </div>
+                                <div class="card-price">
+                                    <?php echo $price_display; ?>
+                                    <?php echo $price_suffix; ?>
+                                </div>
+                                <div class="card-meta">
+                                    <?php if ($prop['bedrooms']): ?>
+                                        <span class="meta-item"><i class="fas fa-bed"></i> <?php echo $prop['bedrooms']; ?> Beds</span>
+                                    <?php endif; ?>
+                                    <?php if ($prop['bathrooms']): ?>
+                                        <span class="meta-item"><i class="fas fa-bath"></i> <?php echo $prop['bathrooms']; ?> Baths</span>
+                                    <?php endif; ?>
+                                    <?php if (!empty($prop['area_size'])): ?>
+                                        <span class="meta-item"><i class="fas fa-vector-square"></i> <?php echo htmlspecialchars($prop['area_size']); ?></span>
+                                    <?php endif; ?>
+                                    <span class="meta-item"><i class="fas fa-building"></i> <?php echo htmlspecialchars($prop['property_type']); ?></span>
+                                </div>
+                                <a href="property-detail.php?id=<?php echo $prop['id']; ?>" class="view-detail-btn">View Details</a>
+                            </div>
+                        </div>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <p>Abhi koi property available nahi hai.</p>
+                    <?php endif; ?>
                 </div>
             </div>
             
@@ -1696,100 +1667,16 @@ justify-content: center;
 <!-- ============================================ -->
 <script>
 // ============================================ //
-// 1. PROPERTY DATA & FILTER (for tabs)        //
-// ============================================ //
-
-const allProperties = [
-    // Buy Properties
-    { title: 'Modern 10 Marla House', location: 'DHA Phase 6, Lahore', price: '1.5M', type: 'buy', beds: 5, baths: 6, area: '10 Marla', extra: 'Furnished', img: 'https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg' },
-    { title: 'Designer Villa', location: 'F-10, Islamabad', price: '2.8M', type: 'buy', beds: 6, baths: 7, area: '1 Kanal', extra: 'Luxury', img: 'https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg' },
-    { title: 'Hayatabad Phase 5 House', location: 'Hayatabad, Peshawar', price: '4.2M', type: 'buy', beds: 5, baths: 5, area: '1 Kanal', extra: 'Gated', img: 'https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg' },
-    // Rent Properties
-    { title: 'Luxury Apartment', location: 'Bahria Town, Karachi', price: '1.2M', type: 'rent', beds: 3, baths: 3, area: '2000 Sqft', extra: 'Furnished', img: 'https://images.pexels.com/photos/2587054/pexels-photo-2587054.jpeg' },
-    { title: 'Luxury Penthouse', location: 'Clifton, Karachi', price: '2.5M', type: 'rent', beds: 4, baths: 5, area: '3500 Sqft', extra: 'Sea View', img: 'https://images.pexels.com/photos/258154/pexels-photo-258154.jpeg' },
-    { title: 'Cozy Studio Apartment', location: 'Gulberg, Lahore', price: '450K', type: 'rent', beds: 2, baths: 2, area: '1200 Sqft', extra: 'Fully Furnished', img: 'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg' },
-    // PG
-    { title: 'Shared PG Room', location: 'F-11, Islamabad', price: '25K', type: 'pg', beds: 1, baths: 1, area: '500 Sqft', extra: 'Meals Included', img: 'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg' },
-    { title: 'Luxury PG', location: 'DHA, Lahore', price: '45K', type: 'pg', beds: 2, baths: 2, area: '800 Sqft', extra: 'AC & WiFi', img: 'https://images.pexels.com/photos/2587054/pexels-photo-2587054.jpeg' },
-    { title: 'Budget PG', location: 'Township, Lahore', price: '15K', type: 'pg', beds: 1, baths: 1, area: '400 Sqft', extra: 'Basic', img: 'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg' },
-    { title: 'Girls PG', location: 'Johar Town, Lahore', price: '20K', type: 'pg', beds: 1, baths: 1, area: '600 Sqft', extra: 'Security', img: 'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg' }
-];
-
-function filterProperties(type) {
-    const grid = document.querySelector('.properties-grid');
-    if (!grid) return;
-
-    let filtered = allProperties.filter(p => p.type === type);
-
-    grid.innerHTML = '';
-    filtered.forEach(prop => {
-        const card = document.createElement('div');
-        card.className = 'property-card';
-        card.innerHTML = `
-            <div class="card-image-slider">
-                <div class="slider-container">
-                    <div class="slider-track">
-                        <img src="${prop.img}" alt="${prop.title}">
-                        <img src="${prop.img}" alt="${prop.title}">
-                        <img src="${prop.img}" alt="${prop.title}">
-                    </div>
-                </div>
-            </div>
-            <div class="card-tag ${prop.type === 'buy' ? 'for-sale' : (prop.type === 'rent' ? 'for-rent' : 'for-pg')}">
-                ${prop.type === 'buy' ? 'For Sale' : (prop.type === 'rent' ? 'For Rent' : 'PG Available')}
-            </div>
-            <a href="javascript:void(0)" class="wishlist-icon" data-title="${prop.title}" onclick="toggleWishlistHome(this)" title="Add to wishlist">
-                <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                </svg>
-            </a>
-            <div class="card-body">
-                <h3>${prop.title}</h3>
-                <div class="card-location">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                        <circle cx="12" cy="10" r="3"/>
-                    </svg>
-                    ${prop.location}
-                </div>
-                <div class="card-price">
-                    PKR ${prop.price}${prop.type !== 'buy' ? '<span class="per-month">/ Month</span>' : ''}
-                </div>
-                <div class="card-meta">
-                    <span class="meta-item"><i class="fas fa-bed"></i> ${prop.beds} Beds</span>
-                    <span class="meta-item"><i class="fas fa-bath"></i> ${prop.baths} Baths</span>
-                    <span class="meta-item"><i class="fas fa-vector-square"></i> ${prop.area}</span>
-                    <span class="meta-item"><i class="fas fa-tag"></i> ${prop.extra}</span>
-                </div>
-                <a href="property-detail.php?id=1" class="view-detail-btn">View Details</a>
-            </div>
-        `;
-        grid.appendChild(card);
-    });
-}
-
-// ============================================ //
-// 2. goToHome FUNCTION                        //
+// 1. goToHome FUNCTION - ab sirf listings.php   //
+//    par redirect karta hai (real DB data)      //
 // ============================================ //
 function goToHome(purpose, event) {
     if (event) event.preventDefault();
-    const btn = event ? event.currentTarget : null;
-    if (btn) {
-        document.querySelectorAll('#propertyTabs .tab').forEach(t => t.classList.remove('active'));
-        btn.classList.add('active');
-    }
-    const filterType = purpose.toLowerCase();
-    if (typeof filterProperties === 'function') {
-        filterProperties(filterType);
-    }
-    setTimeout(() => {
-        const grid = document.querySelector('.properties-grid');
-        if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 350);
+    window.location.href = 'listings.php?purpose=' + encodeURIComponent(purpose);
 }
 
 // ============================================ //
-// 3. SLIDER FUNCTIONS                         //
+// 2. SLIDER FUNCTIONS                         //
 // ============================================ //
 let slideIndexes = {};
 
@@ -1799,8 +1686,7 @@ function initSlider(sliderId, imageCount) {
 }
 
 function updateDots(sliderId, imageCount) {
-    const sliderNum = sliderId.replace('slider', '');
-    const dotsContainer = document.getElementById(`dots${sliderNum}`);
+    const dotsContainer = document.getElementById(sliderId.replace('slider_', 'dots_').replace('slider', 'dots'));
     if (!dotsContainer) return;
     dotsContainer.innerHTML = '';
     for (let i = 0; i < imageCount; i++) {
@@ -1849,9 +1735,9 @@ function nextSlide(sliderId) {
 }
 
 // ============================================ //
-// 4. WISHLIST                                 //
+// 3. WISHLIST                                 //
 // ============================================ //
-const wishlistedTitles = <?php echo json_encode($wishlisted_titles); ?>;
+const wishlistedIds = <?php echo json_encode($wishlisted_ids); ?>;
 
 function showWishlistToast(message, isError) {
     let toast = document.getElementById('wishlistToast');
@@ -1873,11 +1759,11 @@ function showWishlistToast(message, isError) {
 }
 
 function toggleWishlistHome(el) {
-    const title = el.getAttribute('data-title');
+    const propertyId = el.getAttribute('data-id');
     fetch('toggle-wishlist.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
-        body: 'ajax=1&property_title=' + encodeURIComponent(title)
+        body: 'ajax=1&property_id=' + encodeURIComponent(propertyId)
     })
     .then(res => res.json())
     .then(data => {
@@ -1898,14 +1784,14 @@ function toggleWishlistHome(el) {
 }
 
 // ============================================ //
-// 5. DOMContentLoaded – SETUP                 //
+// 4. DOMContentLoaded – SETUP                 //
 // ============================================ //
 document.addEventListener('DOMContentLoaded', function() {
-    // --- Active tab from URL ---
+    // --- Active tab from URL (visual highlight only) ---
     const urlParams = new URLSearchParams(window.location.search);
     const currentPurpose = urlParams.get('purpose');
     const tabs = document.querySelectorAll('#propertyTabs .tab');
-    if (tabs.length > 0) {
+    if (tabs.length > 0 && currentPurpose) {
         tabs.forEach(t => t.classList.remove('active'));
         if (currentPurpose === 'Sale') {
             document.querySelector('[data-type="buy"]')?.classList.add('active');
@@ -1913,49 +1799,47 @@ document.addEventListener('DOMContentLoaded', function() {
             document.querySelector('[data-type="rent"]')?.classList.add('active');
         } else if (currentPurpose === 'PG') {
             document.querySelector('[data-type="pg"]')?.classList.add('active');
-        } else {
-            document.querySelector('[data-type="buy"]')?.classList.add('active');
         }
     }
 
-    // --- Initialize sliders for the 6 static cards ---
-    for (let i = 1; i <= 6; i++) {
-        const sliderId = `slider${i}`;
-        const slider = document.getElementById(sliderId);
-        if (slider) {
-            const track = slider.querySelector('.slider-track');
-            if (track) {
-                const images = track.querySelectorAll('img');
-                initSlider(sliderId, images.length);
-            }
+    // --- Initialize sliders for real (DB-driven) featured cards ---
+    document.querySelectorAll('#featuredGrid .card-image-slider').forEach(function(slider) {
+        const track = slider.querySelector('.slider-track');
+        if (track) {
+            const images = track.querySelectorAll('img');
+            initSlider(slider.id, images.length);
         }
-    }
+    });
 
-    // --- Pre‑fill wishlist hearts ---
-    document.querySelectorAll('.wishlist-icon[data-title]').forEach(el => {
-        if (wishlistedTitles.includes(el.getAttribute('data-title'))) {
+    // --- Pre-fill wishlist hearts (safety net; PHP already sets 'active' class) ---
+    document.querySelectorAll('.wishlist-icon[data-id]').forEach(el => {
+        if (wishlistedIds.includes(parseInt(el.getAttribute('data-id'), 10))) {
             el.classList.add('active');
         }
     });
 
-    // --- If purpose exists in URL, apply filter (override static) ---
-    if (currentPurpose) {
-        const typeMap = { 'Sale': 'buy', 'Rent': 'rent', 'PG': 'pg' };
-        const type = typeMap[currentPurpose] || 'buy';
-        filterProperties(type);
-    }
-
-    // --- Tab click filter ---
-    tabs.forEach(tab => {
-        tab.addEventListener('click', function(e) {
-            const type = this.getAttribute('data-type');
-            const purposeMap = { 'buy': 'Sale', 'rent': 'Rent', 'pg': 'PG' };
-            const purpose = purposeMap[type] || 'Sale';
-            filterProperties(type);
-            tabs.forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
+    // --- Ripple effect + reset button (Find Your Property widget) ---
+    const searchBtn = document.getElementById('searchBtn');
+    if (searchBtn) {
+        searchBtn.addEventListener('click', function(e) {
+            const ripple = document.createElement('span');
+            ripple.classList.add('ripple');
+            const rect = this.getBoundingClientRect();
+            const size = Math.max(rect.width, rect.height);
+            ripple.style.width = ripple.style.height = size + 'px';
+            ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+            ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+            this.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 600);
         });
-    });
+    }
+    const resetBtn = document.getElementById('resetBtn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('filterForm').reset();
+        });
+    }
 });
 </script>
 

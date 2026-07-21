@@ -3,14 +3,14 @@ $page_title = 'All Properties';
 require_once __DIR__ . '/includes/config.php';
 include 'includes/header.php';
 
-// ===== WISHLIST TITLES (added) =====
-$wishlisted_titles = [];
+// ===== WISHLIST IDS (ID-based — unique, no duplicate-title mismatch) =====
+$wishlisted_ids = [];
 if (isset($_SESSION['user_id'])) {
     $wl_user_id = (int) $_SESSION['user_id'];
-    $wl_query = mysqli_query($conn, "SELECT p.title FROM wishlist w INNER JOIN properties p ON w.property_id = p.id WHERE w.user_id = $wl_user_id");
+    $wl_query = mysqli_query($conn, "SELECT property_id FROM wishlist WHERE user_id = $wl_user_id");
     if ($wl_query) {
         while ($wl_row = mysqli_fetch_assoc($wl_query)) {
-            $wishlisted_titles[] = $wl_row['title'];
+            $wishlisted_ids[] = (int) $wl_row['property_id'];
         }
     }
 }
@@ -28,7 +28,7 @@ $sort = isset($_GET['sort']) ? $_GET['sort'] : 'newest';
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $per_page = 12;
 
-$where = ["p.status = 'available'"];  // درست
+$where = ["p.status = 'Active'"];  // درست (matches actual DB value)
 
 if (!empty($search)) {
     $s = mysqli_real_escape_string($conn, $search);
@@ -87,7 +87,7 @@ $all_cities = [
 ];
 
 $db_cities = [];
-$cities_result = mysqli_query($conn, "SELECT DISTINCT city FROM properties WHERE status = 'available' ORDER BY city");
+$cities_result = mysqli_query($conn, "SELECT DISTINCT city FROM properties WHERE status = 'Active' ORDER BY city");
 if ($cities_result) {
     while ($r = mysqli_fetch_assoc($cities_result)) {
         $db_cities[] = $r['city'];
@@ -97,7 +97,7 @@ $cities = array_unique(array_merge($all_cities, $db_cities));
 sort($cities);
 
 $db_types = [];
-$types_result = mysqli_query($conn, "SELECT DISTINCT property_type FROM properties WHERE status = 'available' ORDER BY property_type");
+$types_result = mysqli_query($conn, "SELECT DISTINCT property_type FROM properties WHERE status = 'Active' ORDER BY property_type");
 if ($types_result) {
     while ($r = mysqli_fetch_assoc($types_result)) {
         $db_types[] = $r['property_type'];
@@ -826,10 +826,7 @@ function getPropertyImages($type, $id)
             <div class="properties-grid">
                 <?php while ($prop = mysqli_fetch_assoc($result)):
                     $images = getPropertyImages($prop['property_type'], $prop['id']);
-                    echo "<pre>";
-print_r($images);
-echo "</pre>";
-                    $is_wishlisted = in_array($prop['title'], $wishlisted_titles ?? []);
+                    $is_wishlisted = in_array((int) $prop['id'], $wishlisted_ids);
                     // Format price
                     $price_formatted = number_format($prop['price'] / 1000000, 1);
                     $price_display = $prop['price'] > 0 ? 'PKR ' . $price_formatted . 'M' : '<span class="contact-price">Contact for Price</span>';
@@ -857,7 +854,7 @@ echo "</pre>";
                         <?php if ($prop['featured']): ?>
                             <div class="featured-badge">Featured</div>
                         <?php endif; ?>
-                        <a href="javascript:void(0)" class="wishlist-icon <?php echo $is_wishlisted ? 'active' : ''; ?>" data-title="<?php echo htmlspecialchars($prop['title']); ?>" onclick="toggleWishlistHome(this)" title="Add to wishlist">
+                        <a href="javascript:void(0)" class="wishlist-icon <?php echo $is_wishlisted ? 'active' : ''; ?>" data-id="<?php echo (int) $prop['id']; ?>" onclick="toggleWishlistHome(this)" title="Add to wishlist">
                             <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
                                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                             </svg>
@@ -985,9 +982,9 @@ window.nextSlide = function(sliderId) {
 }
 
 // ============================================ //
-// WISHLIST TOGGLE                            //
+// WISHLIST TOGGLE (ID-based)                  //
 // ============================================ //
-const wishlistedTitles = <?php echo json_encode($wishlisted_titles ?? []); ?>;
+const wishlistedIds = <?php echo json_encode($wishlisted_ids ?? []); ?>;
 
 function showWishlistToast(message, isError) {
     let toast = document.getElementById('wishlistToast');
@@ -1009,11 +1006,11 @@ function showWishlistToast(message, isError) {
 }
 
 function toggleWishlistHome(el) {
-    const title = el.getAttribute('data-title');
+    const propertyId = el.getAttribute('data-id');
     fetch('toggle-wishlist.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
-        body: 'ajax=1&property_title=' + encodeURIComponent(title)
+        body: 'ajax=1&property_id=' + encodeURIComponent(propertyId)
     })
     .then(res => res.json())
     .then(data => {
