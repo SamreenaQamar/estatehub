@@ -125,24 +125,28 @@ body { background: #F8FAFC; }
 
 .wishlist-section { padding: 40px 0 60px; background: #F8FAFC; min-height: 400px; }
 
+/* ===== GRID - 4 COLUMNS (same as property-detail related) ===== */
 .wishlist-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
 }
-@media (max-width: 992px) { .wishlist-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 576px) { .wishlist-grid { grid-template-columns: 1fr; } }
+@media (max-width: 992px) { .wishlist-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 768px) { .wishlist-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .wishlist-grid { grid-template-columns: 1fr; } }
 
 /* ============================================ */
 /* PREMIUM PROPERTY CARD - IDENTICAL TO HOME     */
 /* ============================================ */
 .premium-card {
+    background: #fff;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-    background: #fff;
     position: relative;
+    display: flex;
+    flex-direction: column;
 }
 .premium-card:hover {
     transform: translateY(-6px);
@@ -152,7 +156,7 @@ body { background: #F8FAFC; }
     border-radius: 16px 16px 0 0;
     overflow: hidden;
     position: relative;
-    height: 200px;
+    height: 180px;
     background: #f3f4f6;
 }
 .card-image-slider .slider-container { width: 100%; height: 100%; overflow: hidden; }
@@ -221,7 +225,6 @@ body { background: #F8FAFC; }
     z-index: 4;
 }
 
-/* Heart wishlist icon - identical to home */
 .wishlist-icon {
     position: absolute;
     top: 12px;
@@ -239,49 +242,79 @@ body { background: #F8FAFC; }
 }
 .wishlist-icon:hover { background: rgba(0,0,0,0.6); }
 .wishlist-icon svg { width: 18px; height: 18px; stroke: white; fill: none; }
-.wishlist-icon.active svg { fill: #ef4444; stroke: #ef4444; }
-
-.premium-card .card-body { padding: 20px 20px 18px; }
-.card-body h3 { font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 4px; line-height: 1.3; }
+.wishlist-icon.active svg {
+    fill: #ffffff;
+    stroke: #ffffff;
+}
+.premium-card .card-body {
+    padding: 16px 18px 18px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.card-body h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 4px;
+    line-height: 1.3;
+}
 .card-location {
     font-size: 12px;
     color: #6B7280;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     display: flex;
     align-items: center;
     gap: 4px;
 }
 .card-location svg { width: 14px; height: 14px; stroke: currentColor; flex-shrink: 0; }
 
-.premium-card .card-price { font-size: 24px; font-weight: 800; color: #0E7A4E; margin: 8px 0 12px; }
-.premium-card .per-month { font-size: 14px; font-weight: 600; color: #64748b; }
-.contact-price { font-size: 16px; font-weight: 700; color: #ef4444; }
+.premium-card .card-price {
+    font-size: 20px;
+    font-weight: 800;
+    color: #0E7A4E;
+    margin: 6px 0 10px;
+}
+.premium-card .per-month { font-size: 13px; font-weight: 600; color: #64748b; }
+.contact-price { font-size: 15px; font-weight: 700; color: #ef4444; }
 
 .premium-card .card-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px 14px;
-    margin-bottom: 14px;
+    gap: 4px 12px;
+    margin-bottom: 12px;
     border-top: 1px solid #eef2f7;
-    padding-top: 12px;
+    padding-top: 10px;
 }
-.premium-card .meta-item { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 500; color: #1e293b; }
-.premium-card .meta-item i { font-size: 14px; color: #1e293b; width: 16px; text-align: center; }
+.premium-card .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #1e293b;
+}
+.premium-card .meta-item i {
+    font-size: 13px;
+    color: #1e293b;
+    width: 16px;
+    text-align: center;
+}
 
 .view-detail-btn {
     display: block;
     width: 100%;
     text-align: center;
-    padding: 12px 0;
+    padding: 10px 0;
     background: linear-gradient(135deg, #0E7A4E, #16a34a);
     color: #fff;
-    border-radius: 12px;
+    border-radius: 10px;
     font-weight: 700;
-    font-size: 15px;
+    font-size: 14px;
     text-decoration: none;
     transition: 0.3s;
     border: none;
-    margin-top: 4px;
+    margin-top: auto;
 }
 .view-detail-btn:hover {
     background: #0a5c3a;
@@ -325,7 +358,6 @@ body { background: #F8FAFC; }
 @media (max-width: 768px) {
     .wishlist-hero { padding: 40px 0 30px; }
     .wishlist-hero h1 { font-size: 30px; }
-    .premium-card .card-image-slider { height: 180px; }
 }
 </style>
 </head>

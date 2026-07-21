@@ -4,6 +4,20 @@ require_once __DIR__ . '/includes/config.php';
 include 'includes/header.php';
 
 // ============================================
+// WISHLIST IDS (ID-based)
+// ============================================
+$wishlisted_ids = [];
+if (isset($_SESSION['user_id'])) {
+    $wl_user_id = (int) $_SESSION['user_id'];
+    $wl_query = mysqli_query($conn, "SELECT property_id FROM wishlist WHERE user_id = $wl_user_id");
+    if ($wl_query) {
+        while ($wl_row = mysqli_fetch_assoc($wl_query)) {
+            $wishlisted_ids[] = (int) $wl_row['property_id'];
+        }
+    }
+}
+
+// ============================================
 // GET PARAMETERS
 // ============================================
 $location   = isset($_GET['location'])   ? trim($_GET['location'])   : '';
@@ -32,7 +46,6 @@ if (!empty($purpose)) {
 // ============================================
 // BUILD WHERE CLAUSE
 // ============================================
-// Properties table stores status as 'Active' (capital A) - confirmed via phpMyAdmin
 $where = ["p.status = 'Active'"];
 
 if (!empty($search)) {
@@ -91,48 +104,27 @@ $locations = [
 $property_types = ['House', 'Apartment', 'Plot', 'Commercial', 'Farm House', 'Villa', 'Penthouse', 'Portion'];
 
 // ============================================
-// IMAGES FUNCTION
+// IMAGES FUNCTION - SAME AS OTHER PAGES (assets/images/)
 // ============================================
-function getPropertyImages($type, $id) {
-    $allImages = [
-        'https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1396132/pexels-photo-1396132.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1571459/pexels-photo-1571459.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/2587054/pexels-photo-2587054.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/2587056/pexels-photo-2587056.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/2587052/pexels-photo-2587052.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/2587058/pexels-photo-2587058.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1571458/pexels-photo-1571458.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/323781/pexels-photo-323781.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/323782/pexels-photo-323782.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/323783/pexels-photo-323783.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/258154/pexels-photo-258154.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/258158/pexels-photo-258158.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/258159/pexels-photo-258159.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/258160/pexels-photo-258160.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1643384/pexels-photo-1643384.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1643385/pexels-photo-1643385.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1643386/pexels-photo-1643386.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/280229/pexels-photo-280229.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/280232/pexels-photo-280232.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/280233/pexels-photo-280233.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/280234/pexels-photo-280234.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/208736/pexels-photo-208736.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/208740/pexels-photo-208740.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/208738/pexels-photo-208738.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/208739/pexels-photo-208739.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/1029599/pexels-photo-1029599.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350',
-        'https://images.pexels.com/photos/276724/pexels-photo-276724.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=250&w=350'
-    ];
-    $seed = $id * 37 + 13;
-    $offset = $seed % count($allImages);
+function getPropertyImages($type, $id)
+{
+    switch (strtolower(trim($type))) {
+        case 'house':        $folder = 'house'; break;
+        case 'apartment':    $folder = 'apartment'; break;
+        case 'plot':         $folder = 'plot'; break;
+        case 'commercial':   $folder = 'commercial'; break;
+        case 'farm house':   $folder = 'farmhouse'; break;
+        case 'villa':        $folder = 'villa'; break;
+        case 'penthouse':    $folder = 'penthouse'; break;
+        case 'portion':      $folder = 'portion'; break;
+        default:             $folder = 'house'; break;
+    }
+
     $images = [];
+    $start = ($id % 10) + 1;
     for ($i = 0; $i < 4; $i++) {
-        $images[] = $allImages[($offset + $i * 7) % count($allImages)];
+        $num = (($start + $i - 1) % 10) + 1;
+        $images[] = "assets/images/$folder/$num.jpg";
     }
     return $images;
 }
@@ -144,20 +136,6 @@ function buildFilterUrl($removeKey) {
     $params = $_GET;
     unset($params[$removeKey]);
     return 'search-results.php?' . http_build_query($params);
-}
-
-// ============================================
-// WISHLIST
-// ============================================
-$wishlisted_titles = [];
-if (isset($_SESSION['user_id'])) {
-    $wl_user_id = (int) $_SESSION['user_id'];
-    $wl_query = mysqli_query($conn, "SELECT p.title FROM wishlist w INNER JOIN properties p ON w.property_id = p.id WHERE w.user_id = $wl_user_id");
-    if ($wl_query) {
-        while ($wl_row = mysqli_fetch_assoc($wl_query)) {
-            $wishlisted_titles[] = $wl_row['title'];
-        }
-    }
 }
 ?>
 <!DOCTYPE html>
@@ -234,7 +212,7 @@ if (isset($_SESSION['user_id'])) {
         .wishlist-icon { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.4); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; z-index: 2; }
         .wishlist-icon:hover { background: rgba(0,0,0,0.6); }
         .wishlist-icon svg { width: 18px; height: 18px; stroke: white; fill: none; }
-        .wishlist-icon.active svg { fill: #ef4444; stroke: #ef4444; }
+        .wishlist-icon.active svg { fill: #ff2d55; stroke: #ff2d55; }
         .card-body { padding: 16px 18px 18px; flex: 1; display: flex; flex-direction: column; }
         .card-body h3 { font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 4px; line-height: 1.3; }
         .card-location { font-size: 12px; color: #6B7280; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
@@ -253,12 +231,6 @@ if (isset($_SESSION['user_id'])) {
         .empty-state p { color: #6B7280; font-size: 13px; }
         .empty-state .btn { display: inline-block; padding: 11px 24px; background: #0E7A4E; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 0 5px; }
         .empty-state .btn-outline { background: transparent; border: 1px solid #D1D5DB; color: #374151; }
-        .property-card .card-image-slider .slider-track img { transition: transform 0.6s ease; }
-        .property-card:hover .card-image-slider .slider-track img { transform: scale(1.03); }
-        .property-card .wishlist-icon { transition: all 0.3s ease; }
-        .property-card .wishlist-icon:hover { background: #0E7A4E; transform: scale(1.1); }
-        .property-card .wishlist-icon.active { background: #0E7A4E; }
-        .property-card .wishlist-icon.active svg { fill: #fff; stroke: #fff; }
         @media (max-width: 1100px) { .properties-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 850px) { .search-layout { flex-direction: column; } .filter-widget { width: 100%; position: static; max-height: none; min-width: auto; max-width: none; } }
         @media (max-width: 550px) { .properties-grid { grid-template-columns: 1fr; } }
@@ -372,7 +344,7 @@ if (isset($_SESSION['user_id'])) {
         <div class="properties-grid">
             <?php while ($prop = mysqli_fetch_assoc($result)):
                 $images = getPropertyImages($prop['property_type'], $prop['id']);
-                $is_wishlisted = in_array($prop['title'], $wishlisted_titles ?? []);
+                $is_wishlisted = in_array((int) $prop['id'], $wishlisted_ids);
                 $price_formatted = number_format($prop['price'] / 1000000, 1);
                 $price_display = $prop['price'] > 0 ? 'PKR ' . $price_formatted . 'M' : '<span class="contact-price">Contact for Price</span>';
                 $price_suffix = ($prop['purpose'] == 'Rent' && $prop['price'] > 0) ? ' <span class="per-month">/ Month</span>' : '';
@@ -382,7 +354,7 @@ if (isset($_SESSION['user_id'])) {
                     <div class="slider-container">
                         <div class="slider-track">
                             <?php foreach ($images as $img): ?>
-                                <img src="<?php echo $img; ?>" alt="<?php echo htmlspecialchars($prop['title']); ?>" loading="lazy">
+                                <img src="<?php echo htmlspecialchars($img); ?>" alt="<?php echo htmlspecialchars($prop['title']); ?>" loading="lazy" onerror="this.src='assets/images/house/1.jpg';">
                             <?php endforeach; ?>
                         </div>
                     </div>
@@ -396,7 +368,7 @@ if (isset($_SESSION['user_id'])) {
                 <?php if ($prop['featured']): ?>
                     <div class="featured-badge">Featured</div>
                 <?php endif; ?>
-                <a href="javascript:void(0)" class="wishlist-icon <?php echo $is_wishlisted ? 'active' : ''; ?>" data-title="<?php echo htmlspecialchars($prop['title']); ?>" onclick="toggleWishlistHome(this)" title="Add to wishlist">
+                <a href="javascript:void(0)" class="wishlist-icon <?php echo $is_wishlisted ? 'active' : ''; ?>" data-id="<?php echo (int) $prop['id']; ?>" onclick="toggleWishlistHome(this)" title="Add to wishlist">
                     <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                     </svg>
@@ -493,7 +465,10 @@ window.nextSlide = function(sliderId) {
     if (currentIndex >= images.length) currentIndex = 0;
     goToSlide(sliderId, currentIndex);
 }
-const wishlistedTitles = <?php echo json_encode($wishlisted_titles ?? []); ?>;
+
+// ============================================ //
+// WISHLIST TOGGLE (ID-based)                  //
+// ============================================ //
 function showWishlistToast(message, isError) {
     let toast = document.getElementById('wishlistToast');
     if (!toast) {
@@ -512,12 +487,13 @@ function showWishlistToast(message, isError) {
         toast.style.transform = 'translateY(10px)';
     }, 2500);
 }
+
 function toggleWishlistHome(el) {
-    const title = el.getAttribute('data-title');
+    const propertyId = el.getAttribute('data-id');
     fetch('toggle-wishlist.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
-        body: 'ajax=1&property_title=' + encodeURIComponent(title)
+        body: 'ajax=1&property_id=' + encodeURIComponent(propertyId)
     })
     .then(res => res.json())
     .then(data => {
@@ -536,6 +512,7 @@ function toggleWishlistHome(el) {
     })
     .catch(() => showWishlistToast('Network error, please try again', true));
 }
+
 document.addEventListener('DOMContentLoaded', function() {
     const searchBtn = document.getElementById('searchBtn');
     if (searchBtn) {

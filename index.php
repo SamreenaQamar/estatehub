@@ -758,13 +758,31 @@ justify-content: center;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: 0.2s;
-    z-index: 4;
+    transition: all 0.3s ease;
+    z-index: 2;
 }
-.wishlist-icon:hover { background: rgba(0,0,0,0.6); }
-.wishlist-icon svg { width: 18px; height: 18px; stroke: white; fill: none; }
-.wishlist-icon.active svg { fill: #ef4444; stroke: #ef4444; }
 
+.wishlist-icon:hover {
+    background: rgba(0,0,0,0.6);
+}
+
+.wishlist-icon svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: #ffffff;
+    transition: all 0.3s ease;
+}
+
+/* Wishlist Added */
+.wishlist-icon.active {
+    background: #ef4444;
+}
+
+.wishlist-icon.active svg {
+    fill: #ffffff;
+    stroke: #ffffff;
+}
 .premium-card .card-body {
     padding: 20px 20px 18px;
 }

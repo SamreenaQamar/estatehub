@@ -11,6 +11,58 @@ $property = null;
 $agent = null;
 $images = [];
 
+// wishlist state (needed so related-property cards can show the heart icon,
+// same as index.php / listings.php)
+$wishlisted_ids = [];
+if (isset($_SESSION['user_id'])) {
+    $wl_user_id = (int) $_SESSION['user_id'];
+    $wl_query = mysqli_query($conn, "SELECT property_id FROM wishlist WHERE user_id = $wl_user_id");
+    if ($wl_query) {
+        while ($wl_row = mysqli_fetch_assoc($wl_query)) {
+            $wishlisted_ids[] = (int) $wl_row['property_id'];
+        }
+    }
+}
+
+// ============================================
+// SAME FUNCTION AS index.php / listings.php / wishlist.php
+// ============================================
+function getPropertyImages($type, $id)
+{
+    switch (strtolower(trim($type))) {
+        case 'house':        $folder = 'house'; break;
+        case 'apartment':    $folder = 'apartment'; break;
+        case 'plot':         $folder = 'plot'; break;
+        case 'commercial':   $folder = 'commercial'; break;
+        case 'farm house':   $folder = 'farmhouse'; break;
+        case 'villa':        $folder = 'villa'; break;
+        case 'penthouse':    $folder = 'penthouse'; break;
+        case 'portion':      $folder = 'portion'; break;
+        default:             $folder = 'house'; break;
+    }
+
+    $images = [];
+    $start = ($id % 10) + 1;
+    for ($i = 0; $i < 4; $i++) {
+        $num = (($start + $i - 1) % 10) + 1;
+        $images[] = "assets/images/$folder/$num.jpg";
+    }
+    return $images;
+}
+
+function formatCardPrice($price, $purpose)
+{
+    if ($price > 0) {
+        $formatted = number_format($price / 1000000, 1);
+        $html = 'PKR ' . $formatted . 'M';
+        if ($purpose == 'Rent') {
+            $html .= ' <span class="per-month">/ Month</span>';
+        }
+        return $html;
+    }
+    return '<span class="contact-price">Contact for Price</span>';
+}
+
 if ($property_id > 0) {
     $query = "
         SELECT p.*, u.id as agent_id, u.full_name as agent_name, u.email as agent_email, u.phone as agent_phone, u.profile_pic as agent_image
@@ -21,58 +73,33 @@ if ($property_id > 0) {
     $result = mysqli_query($conn, $query);
     if ($result && mysqli_num_rows($result) > 0) {
         $property = mysqli_fetch_assoc($result);
-        
-        // --- Build images array with proper path checking ---
-        $image_paths = [];
-        
-        // Check main image
-        if (!empty($property['image_main'])) {
-            // Try direct path
-            if (file_exists($property['image_main'])) {
-                $image_paths[] = $property['image_main'];
-            } elseif (file_exists('../' . $property['image_main'])) {
-                $image_paths[] = '../' . $property['image_main'];
-            } else {
-                $image_paths[] = $property['image_main'];
-            }
-        }
-        
-        // Check extra images
-        if (!empty($property['images'])) {
-            $extra = explode(',', $property['images']);
-            foreach ($extra as $img) {
-                $img = trim($img);
-                if (!empty($img)) {
-                    if (file_exists($img)) {
-                        $image_paths[] = $img;
-                    } elseif (file_exists('../' . $img)) {
-                        $image_paths[] = '../' . $img;
-                    } else {
-                        $image_paths[] = $img;
-                    }
-                }
-            }
-        }
-        
-        // Deduplicate and filter out empty
-        $images = array_unique(array_filter($image_paths));
-        
-        // If no images, use placeholder
-        if (empty($images)) {
-            // Get property type for better placeholder
-            $type = strtolower($property['property_type'] ?? 'house');
-            $images[] = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&h=600&fit=crop&crop=center&sig=' . $property_id;
-        }
-        
+
+        // Same image set as shown on home/listings/wishlist for this property
+        $images = getPropertyImages($property['property_type'], $property['id']);
+
         // --- Agent image ---
-        $agent_image = 'https://ui-avatars.com/api/?name=' . urlencode($property['agent_name']) . '&background=0E7A4E&color=fff&size=100';
+        $agent_image = 'https://ui-avatars.com/api/?name=' . urlencode($property['agent_name'] ?: 'Agent') . '&background=0E7A4E&color=fff&size=100';
         if (!empty($property['agent_image'])) {
-            $pic_file = "../uploads/profiles/" . $property['agent_image'];
+            $pic_file = __DIR__ . "/uploads/profiles/" . $property['agent_image'];
             if (file_exists($pic_file)) {
-                $agent_image = $pic_file;
+                $agent_image = "uploads/profiles/" . $property['agent_image'];
             }
         }
         $property['agent_image_url'] = $agent_image;
+
+        // --- Agent WhatsApp number, normalized to international format ---
+        $wa_number = '';
+        if (!empty($property['agent_phone'])) {
+            $digits = preg_replace('/[^0-9]/', '', $property['agent_phone']);
+            if (substr($digits, 0, 1) === '0') {
+                $digits = substr($digits, 1);
+            }
+            if (substr($digits, 0, 2) !== '92') {
+                $digits = '92' . $digits;
+            }
+            $wa_number = $digits;
+        }
+        $property['agent_whatsapp'] = $wa_number;
     }
 }
 
@@ -86,26 +113,15 @@ if (!$property) {
 $related = [];
 $city = mysqli_real_escape_string($conn, $property['city']);
 $rel_query = "
-    SELECT id, title, price, location, image_main 
+    SELECT id, title, price, location, city, property_type, purpose, bedrooms, bathrooms, area_size, featured
     FROM properties 
     WHERE city = '$city' AND id != $property_id AND status = 'Active' 
-    ORDER BY RAND() LIMIT 3
-";
+    ORDER BY RAND() LIMIT 4
+"; // now fetch 4 for the grid
 $rel_result = mysqli_query($conn, $rel_query);
 if ($rel_result) {
     while ($row = mysqli_fetch_assoc($rel_result)) {
-        // Determine image path
-        $img = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400&h=300&fit=crop&crop=center&sig=' . $row['id'];
-        if (!empty($row['image_main'])) {
-            if (file_exists($row['image_main'])) {
-                $img = $row['image_main'];
-            } elseif (file_exists('../' . $row['image_main'])) {
-                $img = '../' . $row['image_main'];
-            } else {
-                $img = $row['image_main'];
-            }
-        }
-        $row['image'] = $img;
+        $row['images'] = getPropertyImages($row['property_type'], $row['id']);
         $related[] = $row;
     }
 }
@@ -162,6 +178,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
     }
 }
 
+// Helper function for safe output
+function safe($val, $default = '') {
+    return !empty($val) ? htmlspecialchars($val) : $default;
+}
+
 // formatPrice() is already defined in config.php - do not redeclare
 ?>
 
@@ -170,7 +191,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($property['title']); ?> - EstateHub</title>
+    <title><?php echo safe($property['title']); ?> - EstateHub</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         /* ===== PROPERTY DETAIL STYLES ===== */
@@ -194,6 +215,33 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
             }
         }
 
+        /* ===== BREADCRUMB ===== */
+        .detail-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #6B7280;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .detail-breadcrumb a {
+            color: #6B7280;
+            text-decoration: none;
+            transition: 0.2s;
+        }
+        .detail-breadcrumb a:hover {
+            color: #0E7A4E;
+        }
+        .detail-breadcrumb i {
+            font-size: 10px;
+            color: #cbd5e1;
+        }
+        .detail-breadcrumb .current {
+            color: #0b1a2e;
+            font-weight: 600;
+        }
+
         /* ===== GALLERY ===== */
         .gallery-wrapper {
             background: #fff;
@@ -201,6 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
             overflow: hidden;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             margin-bottom: 30px;
+            position: relative;
         }
         .main-image {
             height: 450px;
@@ -212,7 +261,64 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            transition: transform 0.4s ease;
         }
+        .detail-tag {
+            position: absolute;
+            top: 18px;
+            left: 18px;
+            padding: 6px 18px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 0.3px;
+            z-index: 3;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .detail-tag.for-sale { background: #0E7A4E; }
+        .detail-tag.for-rent { background: #10B981; }
+        .detail-featured-badge {
+            position: absolute;
+            top: 18px;
+            left: 150px;
+            background: #F59E0B;
+            color: #fff;
+            padding: 6px 16px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            z-index: 3;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .gallery-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            color: #0b1a2e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.3s;
+            z-index: 5;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .gallery-arrow:hover {
+            background: #fff;
+            transform: translateY(-50%) scale(1.08);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        .gallery-arrow.prev { left: 12px; }
+        .gallery-arrow.next { right: 12px; }
+
         .gallery-thumbs {
             display: flex;
             gap: 10px;
@@ -266,10 +372,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
             color: #0E7A4E;
             margin-bottom: 20px;
         }
-        .info-card .price .rent-unit {
+        .info-card .price .per-month {
             font-size: 16px;
             font-weight: 400;
             color: #6B7280;
+        }
+        .info-card .price .contact-price {
+            font-size: 22px;
+            font-weight: 700;
+            color: #ef4444;
         }
         .property-meta {
             display: flex;
@@ -330,18 +441,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
         .agent-card {
             background: #fff;
             border-radius: 20px;
-            padding: 25px;
+            overflow: hidden;
             text-align: center;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             margin-bottom: 30px;
         }
+        .agent-card .agent-header {
+            background: linear-gradient(135deg, #0b1a2e 0%, #0E7A4E 100%);
+            padding: 30px 25px 45px;
+            position: relative;
+        }
         .agent-card .avatar {
-            width: 100px;
-            height: 100px;
+            width: 92px;
+            height: 92px;
             border-radius: 50%;
             object-fit: cover;
-            margin: 0 auto 15px;
-            border: 3px solid #0E7A4E;
+            margin: 0 auto;
+            border: 4px solid #fff;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+            display: block;
+            position: relative;
+            top: 45px;
+        }
+        .agent-card .agent-body {
+            padding: 55px 25px 25px;
+        }
+        .agent-card .verified-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: #E7F5EC;
+            color: #0E7A4E;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 30px;
+            margin-bottom: 10px;
         }
         .agent-card .name {
             font-size: 18px;
@@ -353,15 +488,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
             font-size: 13px;
             margin-bottom: 15px;
         }
-        .agent-card .email-display {
+        .agent-card .contact-line {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;      /* reduced gap */
             font-size: 13px;
             color: #4B5563;
-            margin-bottom: 15px;
+            margin-bottom: 4px; /* reduced margin */
             word-break: break-all;
+            text-align: left;
+            background: #F9FAFB;
+            padding: 6px 12px;  /* reduced padding */
+            border-radius: 10px;
         }
-        .agent-card .email-display i {
-            color: #0E7A4E;
-            margin-right: 6px;
+        .agent-card .contact-line i {
+            color: #1a1a1a;   /* black/dark */
+            width: 16px;
+            flex-shrink: 0;
+        }
+        .agent-card .contact-lines {
+            margin-bottom: 12px; /* reduced */
         }
         .agent-contact-buttons {
             display: flex;
@@ -420,7 +567,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
             margin-bottom: 20px;
         }
         .contact-form-card h3 i {
-            color: #0E7A4E;
+            color: #1a1a1a; /* black/dark */
         }
         .form-group {
             margin-bottom: 15px;
@@ -433,7 +580,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
             margin-bottom: 5px;
         }
         .form-group label i {
-            color: #0E7A4E;
+            color: #1a1a1a; /* black/dark */
             margin-right: 6px;
         }
         .form-group input,
@@ -528,7 +675,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
             color: #0E7A4E;
         }
 
-        /* ===== RELATED PROPERTIES ===== */
+        /* ===== RELATED PROPERTIES — 4 COLUMNS, HOME PAGE STYLE ===== */
         .related-title {
             font-size: 24px;
             font-weight: 700;
@@ -536,77 +683,239 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
             margin: 40px 0 20px;
         }
         .related-title i {
-            color: #0E7A4E;
+            color: #1a1a1a;
             margin-right: 10px;
         }
         .related-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 24px;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+        @media (max-width: 992px) {
+            .related-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
         }
         @media (max-width: 768px) {
+            .related-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 480px) {
             .related-grid {
                 grid-template-columns: 1fr;
             }
         }
-        .related-card {
+
+        /* ===== PREMIUM PROPERTY CARD (copied from home page) ===== */
+        .premium-card {
             background: #fff;
-            border-radius: 18px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border-radius: 16px;
             overflow: hidden;
-            transition: 0.3s;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            position: relative;
+            display: flex;
+            flex-direction: column;
         }
-        .related-card:hover {
+        .premium-card:hover {
             transform: translateY(-6px);
-            box-shadow: 0 12px 30px rgba(0,0,0,0.1);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.12);
         }
-        .related-card img {
-            width: 100%;
-            height: 180px;
-            object-fit: cover;
+        .premium-card .card-image-slider {
+            border-radius: 16px 16px 0 0;
+            overflow: hidden;
+            position: relative;
+            height: 180px; /* slightly smaller for 4-col */
+            background: #f3f4f6;
         }
-        .related-card-body {
-            padding: 16px 18px;
+        .card-image-slider .slider-container { width: 100%; height: 100%; overflow: hidden; }
+        .card-image-slider .slider-track { display: flex; height: 100%; transition: transform 0.5s ease; }
+        .card-image-slider .slider-track img { width: 100%; height: 100%; object-fit: cover; flex-shrink: 0; }
+        .slider-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.7);
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 18px;
+            cursor: pointer;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 3;
         }
-        .related-card-body h4 {
-            font-size: 16px;
+        .premium-card:hover .slider-btn { opacity: 1; pointer-events: auto; }
+        .slider-btn:hover { background: white; }
+        .slider-prev { left: 8px; }
+        .slider-next { right: 8px; }
+        .slider-dots {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 5px;
+            z-index: 3;
+        }
+        .slider-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.5); cursor: pointer; transition: 0.2s; }
+        .slider-dot.active { background: white; width: 16px; border-radius: 4px; }
+
+        .card-tag {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            padding: 4px 14px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            color: white;
+            z-index: 4;
+        }
+        .card-tag.for-sale { background: #0E7A4E; }
+        .card-tag.for-rent { background: #10B981; }
+
+        .featured-badge {
+            position: absolute;
+            top: 12px;
+            left: 90px;
+            background: #F59E0B;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 700;
+            z-index: 4;
+        }
+
+       .wishlist-icon {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 2;
+}
+
+.wishlist-icon:hover {
+    background: rgba(0,0,0,0.6);
+}
+
+.wishlist-icon svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: #ffffff;
+    transition: all 0.3s ease;
+}
+
+/* Wishlist Added */
+.wishlist-icon.active {
+    background: #ef4444;
+}
+
+.wishlist-icon.active svg {
+    fill: #ffffff;
+    stroke: #ffffff;
+}
+        .premium-card .card-body {
+            padding: 16px 18px 18px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .premium-card .card-body h4 {
+            font-size: 15px;
             font-weight: 700;
             color: #0b1a2e;
             margin-bottom: 4px;
         }
-        .related-card-body .location {
-            font-size: 13px;
+        .card-location {
+            font-size: 12px;
             color: #6B7280;
-            margin-bottom: 8px;
-        }
-        .related-card-body .location i {
-            color: #0E7A4E;
-            margin-right: 4px;
-        }
-        .related-card-body .price {
-            font-weight: 700;
-            color: #0E7A4E;
-            margin-bottom: 10px;
-        }
-        .related-card-body .view-link {
-            color: #0E7A4E;
-            text-decoration: none;
-            font-weight: 600;
-            display: inline-flex;
+            margin-bottom: 4px;
+            display: flex;
             align-items: center;
-            gap: 6px;
-            transition: 0.3s;
-            padding: 8px 16px;
-            background: #E7F5EC;
-            border-radius: 8px;
+            gap: 4px;
         }
-        .related-card-body .view-link:hover {
-            gap: 12px;
-            background: #0E7A4E;
+        .card-location svg {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            flex-shrink: 0;
+        }
+        .premium-card .card-price {
+            font-size: 20px;
+            font-weight: 800;
+            color: #0E7A4E;
+            margin: 6px 0 10px;
+        }
+        .premium-card .per-month {
+            font-size: 13px;
+            font-weight: 600;
+            color: #64748b;
+        }
+        .contact-price {
+            font-size: 15px;
+            font-weight: 700;
+            color: #ef4444;
+        }
+        .premium-card .card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 12px;
+            margin-bottom: 12px;
+            border-top: 1px solid #eef2f7;
+            padding-top: 10px;
+        }
+        .premium-card .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #1e293b;
+        }
+        .premium-card .meta-item i {
+            font-size: 13px;
+            color: #1e293b;
+            width: 16px;
+            text-align: center;
+        }
+
+        .view-detail-btn {
+            display: block;
+            width: 100%;
+            text-align: center;
+            padding: 10px 0;
+            background: linear-gradient(135deg, #0E7A4E, #16a34a);
             color: #fff;
-        }
-        .related-card-body .view-link i {
+            border-radius: 10px;
+            font-weight: 700;
             font-size: 14px;
+            text-decoration: none;
+            transition: 0.3s;
+            border: none;
+            margin-top: auto; /* push to bottom */
+        }
+        .view-detail-btn:hover {
+            background: #0a5c3a;
+            transform: scale(1.01);
+            box-shadow: 0 8px 25px rgba(14,122,78,0.3);
         }
 
         /* ===== RESPONSIVE ===== */
@@ -630,6 +939,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
                 width: 70px;
                 height: 50px;
             }
+            .gallery-arrow {
+                width: 36px;
+                height: 36px;
+                font-size: 14px;
+            }
+            .gallery-arrow.prev { left: 8px; }
+            .gallery-arrow.next { right: 8px; }
         }
     </style>
 </head>
@@ -638,6 +954,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
 <section class="property-detail-section">
     <div class="container">
 
+        <div class="detail-breadcrumb">
+            <a href="index.php"><i class="fas fa-home"></i> Home</a> <i class="fas fa-chevron-right"></i>
+            <a href="listings.php">Listings</a> <i class="fas fa-chevron-right"></i>
+            <span class="current"><?php echo safe($property['title']); ?></span>
+        </div>
+
         <div class="detail-grid">
             <!-- LEFT COLUMN -->
             <div>
@@ -645,12 +967,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
                 <!-- Gallery -->
                 <div class="gallery-wrapper">
                     <div class="main-image" id="mainImage">
-                        <img src="<?php echo htmlspecialchars($images[0]); ?>" alt="<?php echo htmlspecialchars($property['title']); ?>">
+                        <span class="detail-tag <?php echo $property['purpose'] == 'Rent' ? 'for-rent' : 'for-sale'; ?>">
+                            <?php echo $property['purpose'] == 'Rent' ? 'For Rent' : 'For Sale'; ?>
+                        </span>
+                        <?php if (!empty($property['featured'])): ?>
+                        <span class="detail-featured-badge"><i class="fas fa-star"></i> Featured</span>
+                        <?php endif; ?>
+                        <img id="mainImg" src="<?php echo safe($images[0]); ?>" alt="<?php echo safe($property['title']); ?>" onerror="this.src='assets/images/house/1.jpg';">
+
+                        <button class="gallery-arrow prev" id="prevBtn" aria-label="Previous image">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button class="gallery-arrow next" id="nextBtn" aria-label="Next image">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
                     </div>
                     <?php if (count($images) > 1): ?>
                     <div class="gallery-thumbs" id="galleryThumbs">
                         <?php foreach ($images as $index => $img): ?>
-                        <img src="<?php echo htmlspecialchars($img); ?>" alt="Thumb" class="<?php echo $index == 0 ? 'active' : ''; ?>" onclick="changeImage('<?php echo htmlspecialchars($img); ?>', this)">
+                        <img src="<?php echo safe($img); ?>" alt="Thumb" class="<?php echo $index == 0 ? 'active' : ''; ?>" data-index="<?php echo $index; ?>" onclick="changeImage(<?php echo $index; ?>)" onerror="this.src='assets/images/house/1.jpg';">
                         <?php endforeach; ?>
                     </div>
                     <?php endif; ?>
@@ -658,16 +993,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
 
                 <!-- Property Info -->
                 <div class="info-card">
-                    <h1><?php echo htmlspecialchars($property['title']); ?></h1>
+                    <h1><?php echo safe($property['title']); ?></h1>
                     <div class="location">
                         <i class="fas fa-map-pin"></i>
-                        <?php echo htmlspecialchars($property['location'] . ', ' . $property['city']); ?>
+                        <?php echo safe($property['location'] . ', ' . $property['city']); ?>
                     </div>
                     <div class="price">
-                        PKR <?php echo formatPrice($property['price']); ?>
-                        <?php if ($property['purpose'] == 'Rent'): ?>
-                            <span class="rent-unit">/ Month</span>
-                        <?php endif; ?>
+                        <?php echo formatCardPrice($property['price'], $property['purpose']); ?>
                     </div>
 
                     <div class="property-meta">
@@ -683,7 +1015,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
                         </div>
                         <div class="meta-item">
                             <i class="fas fa-vector-square"></i>
-                            <span><?php echo htmlspecialchars($property['area']); ?></span>
+                            <span><?php echo safe($property['area'] ?? 'N/A'); ?></span>
                         </div>
                         <div class="meta-item">
                             <i class="fas fa-tag"></i>
@@ -692,18 +1024,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
                         <?php if (!empty($property['property_type'])): ?>
                         <div class="meta-item">
                             <i class="fas fa-home"></i>
-                            <span><?php echo htmlspecialchars($property['property_type']); ?></span>
+                            <span><?php echo safe($property['property_type']); ?></span>
                         </div>
                         <?php endif; ?>
                     </div>
 
                     <div class="description">
                         <h3><i class="fas fa-align-left"></i> Description</h3>
-                        <p><?php echo nl2br(htmlspecialchars($property['description'])); ?></p>
+                        <p><?php echo nl2br(safe($property['description'])); ?></p>
                     </div>
 
                     <?php
-                    // Features from property
                     $features = [];
                     if (!empty($property['features'])) {
                         if (is_string($property['features'])) {
@@ -720,7 +1051,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
                         </h3>
                         <div class="features-list">
                             <?php foreach ($features as $feature): ?>
-                            <span class="feature-tag"><i class="fas fa-check"></i><?php echo htmlspecialchars($feature); ?></span>
+                            <span class="feature-tag"><i class="fas fa-check"></i><?php echo safe($feature); ?></span>
                             <?php endforeach; ?>
                         </div>
                     </div>
@@ -733,25 +1064,44 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
 
                 <!-- Agent Card -->
                 <div class="agent-card">
-                    <img src="<?php echo htmlspecialchars($property['agent_image_url']); ?>" alt="Agent" class="avatar">
-                    <div class="name"><?php echo htmlspecialchars($property['agent_name']); ?></div>
-                    <div class="title"><i class="fas fa-user-tie"></i> Property Agent</div>
-                    <div class="email-display">
-                        <i class="fas fa-envelope"></i> <?php echo htmlspecialchars($property['agent_email']); ?>
+                    <div class="agent-header">
+                        <img src="<?php echo safe($property['agent_image_url']); ?>" alt="Agent" class="avatar" onerror="this.src='https://ui-avatars.com/api/?name=Agent&background=0E7A4E&color=fff&size=100';">
                     </div>
+                    <div class="agent-body">
+                        <div class="verified-badge"><i class="fas fa-circle-check"></i> Verified Agent</div>
+                        <div class="name"><?php echo safe($property['agent_name'], 'Agent'); ?></div>
+                        <div class="title"><i class="fas fa-user-tie"></i> Property Agent</div>
+
+                        <div class="contact-lines">
+                            <?php if (!empty($property['agent_email'])): ?>
+                            <div class="contact-line">
+                                <i class="fas fa-envelope"></i> <?php echo safe($property['agent_email']); ?>
+                            </div>
+                            <?php endif; ?>
+                            <?php if (!empty($property['agent_phone'])): ?>
+                            <div class="contact-line">
+                                <i class="fas fa-phone"></i> <?php echo safe($property['agent_phone']); ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
 
                     <div class="agent-contact-buttons">
-                        <?php if (!empty($property['agent_phone'])): ?>
-                        <a href="https://wa.me/92<?php echo ltrim($property['agent_phone'], '+'); ?>" target="_blank" class="btn-whatsapp">
+                        <?php if (!empty($property['agent_whatsapp'])): ?>
+                        <a href="https://wa.me/<?php echo safe($property['agent_whatsapp']); ?>" target="_blank" class="btn-whatsapp">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
-                        <a href="tel:<?php echo htmlspecialchars($property['agent_phone']); ?>" class="btn-call">
+                        <?php endif; ?>
+                        <?php if (!empty($property['agent_phone'])): ?>
+                        <a href="tel:<?php echo safe($property['agent_phone']); ?>" class="btn-call">
                             <i class="fas fa-phone"></i> Call Now
                         </a>
                         <?php endif; ?>
-                        <a href="mailto:<?php echo htmlspecialchars($property['agent_email']); ?>" class="btn-email">
+                        <?php if (!empty($property['agent_email'])): ?>
+                        <a href="mailto:<?php echo safe($property['agent_email']); ?>" class="btn-email">
                             <i class="fas fa-envelope"></i> Email Agent
                         </a>
+                        <?php endif; ?>
+                    </div>
                     </div>
                 </div>
 
@@ -762,7 +1112,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
                     <?php if ($message_sent): ?>
                         <div class="success-msg"><i class="fas fa-check-circle"></i> Message sent successfully! Agent will contact you soon.</div>
                     <?php elseif ($message_error): ?>
-                        <div class="error-msg"><i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($message_error); ?></div>
+                        <div class="error-msg"><i class="fas fa-exclamation-circle"></i> <?php echo safe($message_error); ?></div>
                     <?php endif; ?>
 
                     <form method="POST">
@@ -794,27 +1144,71 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
                     <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d217295.548657656!2d74.15480682463207!3d31.482859200428948!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39190483e58107d9%3A0xc23abe6ccc7e2462!2sLahore%2C%20Pakistan!5e0!3m2!1sen!2s!4v1714320000000!5m2!1sen!2s" allowfullscreen="" loading="lazy"></iframe>
                     <div class="address">
                         <i class="fas fa-map-pin"></i>
-                        <?php echo htmlspecialchars($property['location'] . ', ' . $property['city']); ?>
+                        <?php echo safe($property['location'] . ', ' . $property['city']); ?>
                     </div>
                 </div>
 
             </div>
         </div>
 
-        <!-- Related Properties -->
+        <!-- Related Properties — 4 columns, same premium card design as home page -->
         <?php if (!empty($related)): ?>
         <h2 class="related-title"><i class="fas fa-building"></i> Similar Properties You May Like</h2>
-        <div class="related-grid">
-            <?php foreach ($related as $rel): ?>
-            <div class="related-card">
-                <img src="<?php echo htmlspecialchars($rel['image']); ?>" alt="<?php echo htmlspecialchars($rel['title']); ?>">
-                <div class="related-card-body">
-                    <h4><?php echo htmlspecialchars($rel['title']); ?></h4>
-                    <div class="location"><i class="fas fa-map-pin"></i> <?php echo htmlspecialchars($rel['location']); ?></div>
-                    <div class="price">PKR <?php echo formatPrice($rel['price']); ?></div>
-                    <a href="property-detail.php?id=<?php echo $rel['id']; ?>" class="view-link">
-                        View Details <i class="fas fa-arrow-right"></i>
-                    </a>
+        <div class="related-grid" id="relatedGrid">
+            <?php foreach ($related as $rel):
+                $rel_is_wishlisted = in_array((int) $rel['id'], $wishlisted_ids);
+            ?>
+            <div class="property-card premium-card" data-property-id="<?php echo $rel['id']; ?>">
+                <div class="card-image-slider" id="rel_slider_<?php echo $rel['id']; ?>">
+                    <div class="slider-container">
+                        <div class="slider-track">
+                            <?php foreach ($rel['images'] as $rimg): ?>
+                                <img src="<?php echo htmlspecialchars($rimg); ?>"
+                                     alt="<?php echo htmlspecialchars($rel['title']); ?>"
+                                     loading="lazy"
+                                     onerror="this.src='assets/images/house/1.jpg';">
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <button class="slider-btn slider-prev" onclick="prevSlide('rel_slider_<?php echo $rel['id']; ?>')">‹</button>
+                    <button class="slider-btn slider-next" onclick="nextSlide('rel_slider_<?php echo $rel['id']; ?>')">›</button>
+                    <div class="slider-dots" id="rel_dots_<?php echo $rel['id']; ?>"></div>
+                </div>
+
+                <div class="card-tag <?php echo $rel['purpose'] == 'Rent' ? 'for-rent' : 'for-sale'; ?>">
+                    <?php echo $rel['purpose'] == 'Rent' ? 'For Rent' : 'For Sale'; ?>
+                </div>
+                <?php if (!empty($rel['featured'])): ?>
+                    <div class="featured-badge">Featured</div>
+                <?php endif; ?>
+
+                <a href="javascript:void(0)" class="wishlist-icon <?php echo $rel_is_wishlisted ? 'active' : ''; ?>"
+                   data-id="<?php echo (int) $rel['id']; ?>"
+                   onclick="toggleWishlistDetail(this)" title="Add to wishlist">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                </a>
+
+                <div class="card-body">
+                    <h4><?php echo safe($rel['title']); ?></h4>
+                    <div class="card-location">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                            <circle cx="12" cy="10" r="3"/>
+                        </svg>
+                        <?php echo safe($rel['location']); ?><?php echo !empty($rel['city']) ? ', ' . safe($rel['city']) : ''; ?>
+                    </div>
+                    <div class="card-price">
+                        <?php echo formatCardPrice($rel['price'], $rel['purpose']); ?>
+                    </div>
+                    <div class="card-meta">
+                        <?php if (!empty($rel['bedrooms'])): ?><span class="meta-item"><i class="fas fa-bed"></i> <?php echo $rel['bedrooms']; ?> Beds</span><?php endif; ?>
+                        <?php if (!empty($rel['bathrooms'])): ?><span class="meta-item"><i class="fas fa-bath"></i> <?php echo $rel['bathrooms']; ?> Baths</span><?php endif; ?>
+                        <?php if (!empty($rel['area_size'])): ?><span class="meta-item"><i class="fas fa-vector-square"></i> <?php echo safe($rel['area_size']); ?></span><?php endif; ?>
+                        <?php if (!empty($rel['property_type'])): ?><span class="meta-item"><i class="fas fa-building"></i> <?php echo safe($rel['property_type']); ?></span><?php endif; ?>
+                    </div>
+                    <a href="property-detail.php?id=<?php echo $rel['id']; ?>" class="view-detail-btn">View Details</a>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -825,10 +1219,147 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['send_message'])) {
 </section>
 
 <script>
-function changeImage(src, element) {
-    document.getElementById('mainImage').querySelector('img').src = src;
-    document.querySelectorAll('.gallery-thumbs img').forEach(img => img.classList.remove('active'));
-    element.classList.add('active');
+// ===================== MAIN GALLERY ===================== //
+let currentIndex = 0;
+const images = <?php echo json_encode($images); ?>;
+const mainImg = document.getElementById('mainImg');
+const thumbs = document.querySelectorAll('.gallery-thumbs img');
+
+function changeImage(index) {
+    if (index < 0) index = images.length - 1;
+    if (index >= images.length) index = 0;
+    currentIndex = index;
+    mainImg.src = images[currentIndex];
+    thumbs.forEach((thumb, i) => {
+        thumb.classList.toggle('active', i === currentIndex);
+    });
+}
+
+document.getElementById('prevBtn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    changeImage(currentIndex - 1);
+});
+
+document.getElementById('nextBtn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    changeImage(currentIndex + 1);
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowLeft') changeImage(currentIndex - 1);
+    if (e.key === 'ArrowRight') changeImage(currentIndex + 1);
+});
+
+// ===================== RELATED CARDS SLIDER (same logic as home page) ===================== //
+let slideIndexes = {};
+
+function initSlider(sliderId, imageCount) {
+    slideIndexes[sliderId] = 0;
+    updateDots(sliderId, imageCount);
+}
+
+function updateDots(sliderId, imageCount) {
+    const dotsContainer = document.getElementById(sliderId.replace('rel_slider_', 'rel_dots_'));
+    if (!dotsContainer) return;
+    dotsContainer.innerHTML = '';
+    for (let i = 0; i < imageCount; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'slider-dot' + (i === slideIndexes[sliderId] ? ' active' : '');
+        dot.onclick = () => goToSlide(sliderId, i);
+        dotsContainer.appendChild(dot);
+    }
+}
+
+function goToSlide(sliderId, index) {
+    const slider = document.getElementById(sliderId);
+    if (!slider) return;
+    const track = slider.querySelector('.slider-track');
+    if (!track) return;
+    const imgs = track.querySelectorAll('img');
+    if (index < 0) index = 0;
+    if (index >= imgs.length) index = imgs.length - 1;
+    slideIndexes[sliderId] = index;
+    track.style.transform = `translateX(-${index * 100}%)`;
+    updateDots(sliderId, imgs.length);
+}
+
+function prevSlide(sliderId) {
+    const slider = document.getElementById(sliderId);
+    if (!slider) return;
+    const track = slider.querySelector('.slider-track');
+    if (!track) return;
+    const imgs = track.querySelectorAll('img');
+    let idx = slideIndexes[sliderId] || 0;
+    idx--;
+    if (idx < 0) idx = imgs.length - 1;
+    goToSlide(sliderId, idx);
+}
+
+function nextSlide(sliderId) {
+    const slider = document.getElementById(sliderId);
+    if (!slider) return;
+    const track = slider.querySelector('.slider-track');
+    if (!track) return;
+    const imgs = track.querySelectorAll('img');
+    let idx = slideIndexes[sliderId] || 0;
+    idx++;
+    if (idx >= imgs.length) idx = 0;
+    goToSlide(sliderId, idx);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('#relatedGrid .card-image-slider').forEach(function(slider) {
+        const track = slider.querySelector('.slider-track');
+        if (track) {
+            const imgs = track.querySelectorAll('img');
+            initSlider(slider.id, imgs.length);
+        }
+    });
+});
+
+// ===================== WISHLIST (same AJAX flow as home page) ===================== //
+function showWishlistToastDetail(message, isError) {
+    let toast = document.getElementById('wishlistToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'wishlistToast';
+        toast.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:14px 22px;border-radius:10px;color:#fff;font-weight:600;font-size:14px;z-index:9999;box-shadow:0 10px 25px rgba(0,0,0,0.15);transition:opacity .3s,transform .3s;opacity:0;transform:translateY(10px);';
+        document.body.appendChild(toast);
+    }
+    toast.style.background = isError ? '#DC2626' : '#16A34A';
+    toast.textContent = message;
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+    clearTimeout(toast._hideTimer);
+    toast._hideTimer = setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+    }, 2500);
+}
+
+function toggleWishlistDetail(el) {
+    const propertyId = el.getAttribute('data-id');
+    fetch('toggle-wishlist.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+        body: 'ajax=1&property_id=' + encodeURIComponent(propertyId)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'login_required') {
+            showWishlistToastDetail('Please login to use wishlist', true);
+            setTimeout(() => { window.location.href = 'login.php'; }, 1200);
+        } else if (data.status === 'added') {
+            el.classList.add('active');
+            showWishlistToastDetail('Added to wishlist ❤️', false);
+        } else if (data.status === 'removed') {
+            el.classList.remove('active');
+            showWishlistToastDetail('Removed from wishlist', false);
+        } else {
+            showWishlistToastDetail(data.message || 'Something went wrong', true);
+        }
+    })
+    .catch(() => showWishlistToastDetail('Network error, please try again', true));
 }
 </script>
 

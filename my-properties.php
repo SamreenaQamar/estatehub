@@ -1,7 +1,6 @@
 <?php
 $page_title = 'My Properties';
 require_once __DIR__ . '/includes/config.php';
-
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();

@@ -1,7 +1,6 @@
 <?php
 $page_title = 'Add Property';
 require_once __DIR__ . '/includes/config.php';
-
 // Only logged-in sellers (or admins) can add a property
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
