@@ -309,22 +309,6 @@ if ($r) {
     }
 }
 
-$stats = [
-    'users' => $user_stats['total'],
-    'pending' => 0,
-    'unread' => 0,
-];
-
-$result = mysqli_query($conn, "SELECT COUNT(*) as total FROM properties WHERE status = 'Pending'");
-if ($result && mysqli_num_rows($result) > 0) {
-    $stats['pending'] = mysqli_fetch_assoc($result)['total'] ?? 0;
-}
-
-$result = mysqli_query($conn, "SELECT COUNT(*) as total FROM messages WHERE is_read = 0");
-if ($result && mysqli_num_rows($result) > 0) {
-    $stats['unread'] = mysqli_fetch_assoc($result)['total'] ?? 0;
-}
-
 // Profile pic for topbar
 $admin_id = $_SESSION['user_id'];
 $profile_pic_path = '';
@@ -470,19 +454,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             transform:scale(1.1);
         }
 
-        .nav-badge {
-            margin-left: auto;
-            background: #ef4444;
-            color: white;
-            border-radius: 50px;
-            padding: 2px 10px;
-            font-size: 10px;
-            font-weight: 700;
-            min-width: 22px;
-            text-align: center;
-        }
-        .nav-badge.blue { background: #0E7A4E; }
-
         .logout-link {
             color:#b8c2cc !important;
         }
@@ -492,11 +463,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
             box-shadow:0 8px 20px rgba(220,38,38,.35) !important;
         }
 
-        /* ===== TOP BAR ===== */
+        /* ===== TOP BAR - DASHBOARD STYLE ===== */
         .topbar {
             display: flex;
             align-items: center;
-            justify-content: flex-end;
+            justify-content: space-between;
             gap: 20px;
             padding: 14px 32px;
             background: #fff;
@@ -505,45 +476,38 @@ $current_page = basename($_SERVER['PHP_SELF']);
             top:0;
             z-index:50;
         }
-        .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; margin-right:auto; }
+        .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; }
 
-        .topbar-actions { display:flex; align-items:center; gap:22px; }
+        .topbar-actions { display:flex; align-items:center; gap:16px; }
         .icon-btn {
             position: relative;
             width: 38px;
             height: 38px;
-            border-radius: 50%;
-            background: transparent;
+            border-radius: 10px;
+            background: #f8fafc;
             border: none;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             transition:0.2s;
-            color:#334155;
+            color:#1e293b;
         }
-        .icon-btn:hover { background:#f1f5f9; }
-        .icon-btn svg { width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:2; }
-        .icon-btn .count {
-            position:absolute; top:-2px; right:-2px;
-            background:#ef4444; color:#fff;
-            font-size:10px; font-weight:700;
-            min-width:18px; height:18px; border-radius:50%;
-            display:flex; align-items:center; justify-content:center;
-            border:2px solid #fff;
-        }
+        .icon-btn:hover { background:#e9ecef; }
+        .icon-btn svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2; }
+
         .user-chip { display:flex; align-items:center; gap:10px; text-decoration:none; }
         .user-avatar {
-            width:38px; height:38px; border-radius:50%;
+            width:36px; height:36px; border-radius:10px;
             background:#0E7A4E; color:#fff;
             display:flex; align-items:center; justify-content:center;
             font-weight:700; font-size:15px; overflow:hidden;
             flex-shrink:0;
         }
         .user-avatar img { width:100%; height:100%; object-fit:cover; }
-        .user-info { display:flex; align-items:center; gap:4px; line-height:1.2; }
+        .user-info { display:flex; flex-direction:column; line-height:1.2; }
         .user-name { font-size:14px; font-weight:700; color:#0b1a2e; }
-        .user-info i.fa-chevron-down { font-size:11px; color:#94a3b8; }
+        .user-role { font-size:12px; color:#6b7a8f; }
 
         /* ============================================================
            CONTENT AREA
@@ -756,7 +720,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .table-row:hover { background:#f8fafc; }
         .table-row:last-child { border-bottom:none; }
 
-        /* User column with avatar */
         .user-cell {
             display:flex;
             align-items:center;
@@ -800,7 +763,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .contact-cell .email { font-weight:500; }
         .contact-cell .phone { font-size:12px; color:#94a3b8; }
 
-        /* ===== ROLE BADGE with transparent background ===== */
         .role-badge {
             display:inline-flex;
             align-items:center;
@@ -823,7 +785,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .role-badge.buyer { background:rgba(37, 99, 235, 0.12); color:#2563eb; }
         .role-badge.buyer .dot { background:#2563eb; }
 
-        /* ===== STATUS BADGE with transparent background ===== */
         .status-badge {
             display:inline-flex;
             align-items:center;
@@ -861,7 +822,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             margin-top:2px;
         }
 
-        /* Actions */
         .actions-cell {
             display:flex;
             gap:8px;
@@ -1127,7 +1087,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     Messages
                 </a>
             </li>
-            <!-- ===== WISHLIST LINK ===== -->
             <li>
                 <a href="wishlist.php" class="<?php echo ($current_page == 'wishlist.php') ? 'active' : ''; ?>">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1169,7 +1128,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     Profile
                 </a>
             </li>
-            <!-- ===== NOTIFICATIONS LINK ===== -->
             <li>
                 <a href="notifications.php" class="<?php echo ($current_page == 'notifications.php') ? 'active' : ''; ?>">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1195,22 +1153,21 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- ===== MAIN CONTENT ===== -->
     <div class="main-content">
 
-        <!-- TOP BAR - UPDATED: Avatar First, then Name, Bell with Badge -->
+        <!-- TOP BAR - DASHBOARD STYLE -->
         <header class="topbar">
             <button class="topbar-menu-btn" onclick="document.getElementById('adminSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
 
+            <div style="flex:1;"></div>
+
             <div class="topbar-actions">
-                <!-- Notification Bell with Badge -->
+                <!-- Notification Bell - NO BADGE -->
                 <button class="icon-btn" title="Notifications" onclick="window.location.href='notifications.php'">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                    <?php if ($stats['unread'] > 0): ?>
-                        <span class="count"><?php echo $stats['unread'] > 9 ? '9+' : $stats['unread']; ?></span>
-                    <?php endif; ?>
                 </button>
 
-                <!-- User Chip: Avatar (left) + Name + Chevron -->
+                <!-- User Chip: Avatar (left) + Name & Role stacked -->
                 <a href="profile.php" class="user-chip">
                     <div class="user-avatar">
                         <?php if (!empty($profile_pic_path)): ?>
@@ -1221,7 +1178,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     </div>
                     <div class="user-info">
                         <span class="user-name"><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'Admin User'); ?></span>
-                        <i class="fas fa-chevron-down"></i>
+                        <span class="user-role">Super Admin</span>
                     </div>
                 </a>
             </div>
@@ -1381,7 +1338,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             $row_index++;
                         ?>
                         <div class="table-row">
-                            <!-- USER column -->
                             <div class="user-cell">
                                 <div class="user-avatar-sm" style="background:<?php echo $palette['bg']; ?>; color:<?php echo $palette['color']; ?>;">
                                     <?php if ($avatar_img): ?>
@@ -1396,13 +1352,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 </div>
                             </div>
 
-                            <!-- CONTACT column -->
                             <div class="contact-cell">
                                 <span class="email"><?php echo htmlspecialchars($user['email']); ?></span>
                                 <span class="phone"><?php echo htmlspecialchars($user['phone'] ?? ''); ?></span>
                             </div>
 
-                            <!-- ROLE with transparent background -->
                             <div>
                                 <span class="role-badge <?php echo role_class($role); ?>">
                                     <span class="dot"></span>
@@ -1410,7 +1364,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 </span>
                             </div>
 
-                            <!-- STATUS with transparent background -->
                             <div>
                                 <span class="status-badge <?php echo $status; ?>">
                                     <span class="dot"></span>
@@ -1418,22 +1371,18 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 </span>
                             </div>
 
-                            <!-- JOINED -->
                             <div class="joined-cell">
                                 <?php echo date('M d, Y', strtotime($user['created_at'])); ?>
                                 <span class="time"><?php echo date('g:i A', strtotime($user['created_at'])); ?></span>
                             </div>
 
-                            <!-- ACTIONS -->
                             <div class="actions-cell">
-                                <!-- View -->
                                 <button type="button" class="action-btn view" title="View"
                                     onclick='viewUser(<?php echo json_encode($view_payload); ?>)'>
                                     <i class="fas fa-eye"></i>
                                 </button>
 
                                 <?php if ($status !== 'deleted'): ?>
-                                    <!-- Edit -->
                                     <button type="button" class="action-btn edit" title="Edit"
                                         onclick="editUser(
                                             <?php echo $user['id']; ?>,
@@ -1449,43 +1398,36 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 <?php endif; ?>
 
                                 <?php if ($status === 'active'): ?>
-                                    <!-- Block -->
                                     <button type="button" class="action-btn block" title="Block"
                                         onclick="openConfirm('block','<?php echo $user['id']; ?>','<?php echo addslashes($user['full_name']); ?>')">
                                         <i class="fas fa-ban"></i>
                                     </button>
-                                    <!-- Delete -->
                                     <button type="button" class="action-btn delete" title="Delete"
                                         onclick="openConfirm('delete','<?php echo $user['id']; ?>','<?php echo addslashes($user['full_name']); ?>')">
                                         <i class="fas fa-trash"></i>
                                     </button>
 
                                 <?php elseif ($status === 'blocked'): ?>
-                                    <!-- Unblock -->
                                     <button type="button" class="action-btn unblock" title="Unblock"
                                         onclick="openConfirm('unblock','<?php echo $user['id']; ?>','<?php echo addslashes($user['full_name']); ?>')">
                                         <i class="fas fa-check-circle"></i>
                                     </button>
-                                    <!-- Delete -->
                                     <button type="button" class="action-btn delete" title="Delete"
                                         onclick="openConfirm('delete','<?php echo $user['id']; ?>','<?php echo addslashes($user['full_name']); ?>')">
                                         <i class="fas fa-trash"></i>
                                     </button>
 
                                 <?php elseif ($status === 'pending'): ?>
-                                    <!-- Approve -->
                                     <button type="button" class="action-btn approve" title="Approve"
                                         onclick="openConfirm('approve','<?php echo $user['id']; ?>','<?php echo addslashes($user['full_name']); ?>')">
                                         <i class="fas fa-check"></i>
                                     </button>
-                                    <!-- Delete -->
                                     <button type="button" class="action-btn delete" title="Delete"
                                         onclick="openConfirm('delete','<?php echo $user['id']; ?>','<?php echo addslashes($user['full_name']); ?>')">
                                         <i class="fas fa-trash"></i>
                                     </button>
 
                                 <?php elseif ($status === 'deleted'): ?>
-                                    <!-- Restore -->
                                     <button type="button" class="action-btn restore" title="Restore"
                                         onclick="openConfirm('restore','<?php echo $user['id']; ?>','<?php echo addslashes($user['full_name']); ?>')">
                                         <i class="fas fa-rotate-left"></i>
@@ -1498,7 +1440,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <div style="padding:48px; text-align:center; color:#94a3b8;">No users found</div>
                 <?php endif; ?>
 
-                <!-- Pagination -->
                 <?php if ($total_rows > 0): ?>
                 <div class="pagination-wrapper">
                     <div class="pagination-info">
@@ -1750,11 +1691,6 @@ document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
         if (e.target === this) this.classList.remove('active');
     });
 });
-setTimeout(function() {
-    if (document.querySelector('.alert-success')) {
-        location.reload();
-    }
-}, 3000);
 </script>
 
 </body>

@@ -7,11 +7,16 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] != 'admin') {
     exit();
 }
 
+// Generate CSRF token if not exists
+if (!isset($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 $page_title = 'Notifications';
 $notifications = [];
 
 $msg_query = mysqli_query($conn,
-    "SELECT m.*, u.full_name as sender_name, u.email as sender_email, p.title as property_title 
+    "SELECT m.id, m.message, m.is_read, m.created_at, u.full_name as sender_name, u.email as sender_email, p.title as property_title 
      FROM messages m 
      JOIN users u ON m.sender_id = u.id 
      LEFT JOIN properties p ON m.property_id = p.id 
@@ -23,6 +28,7 @@ if ($msg_query) {
     while ($row = mysqli_fetch_assoc($msg_query)) {
         $notifications[] = [
             'type' => 'message',
+            'id' => $row['id'],
             'icon' => 'fa-envelope',
             'color' => '#16A366',
             'title' => 'New Message from ' . $row['sender_name'],
@@ -34,7 +40,7 @@ if ($msg_query) {
     }
 }
 
-$user_query = mysqli_query($conn, "SELECT * FROM users ORDER BY created_at DESC LIMIT 10");
+$user_query = mysqli_query($conn, "SELECT id, full_name, email, user_type, created_at FROM users ORDER BY created_at DESC LIMIT 10");
 
 if ($user_query) {
     while ($row = mysqli_fetch_assoc($user_query)) {
@@ -42,6 +48,7 @@ if ($user_query) {
         if ($time_diff < 86400 * 7) {
             $notifications[] = [
                 'type' => 'user',
+                'id' => $row['id'],
                 'icon' => 'fa-user-plus',
                 'color' => '#10b981',
                 'title' => 'New User Registered',
@@ -54,12 +61,13 @@ if ($user_query) {
     }
 }
 
-$inq_query = mysqli_query($conn, "SELECT * FROM inquiries ORDER BY created_at DESC LIMIT 10");
+$inq_query = mysqli_query($conn, "SELECT id, name, email, subject, message, is_replied, created_at FROM inquiries ORDER BY created_at DESC LIMIT 10");
 
 if ($inq_query) {
     while ($row = mysqli_fetch_assoc($inq_query)) {
         $notifications[] = [
             'type' => 'inquiry',
+            'id' => $row['id'],
             'icon' => 'fa-question-circle',
             'color' => '#f59e0b',
             'title' => 'New Inquiry: ' . ($row['subject'] ?? 'General Inquiry'),
@@ -72,7 +80,7 @@ if ($inq_query) {
 }
 
 $prop_query = mysqli_query($conn,
-    "SELECT p.*, u.full_name as owner_name 
+    "SELECT p.id, p.title, p.price, p.created_at, u.full_name as owner_name 
      FROM properties p 
      JOIN users u ON p.user_id = u.id 
      ORDER BY p.created_at DESC 
@@ -85,6 +93,7 @@ if ($prop_query) {
         if ($time_diff < 86400 * 7) {
             $notifications[] = [
                 'type' => 'property',
+                'id' => $row['id'],
                 'icon' => 'fa-home',
                 'color' => '#8b5cf6',
                 'title' => 'New Property Listed',
@@ -187,7 +196,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .sidebar::-webkit-scrollbar { width:4px; }
         .sidebar::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:10px; }
 
-        /* ===== LOGO ===== */
         .logo {
             padding:0 4px 20px;
             margin-bottom:20px;
@@ -222,7 +230,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             border-radius:10px;
         }
 
-        /* ===== SIDEBAR MENU ===== */
         .sidebar-label {
             font-size: 11px;
             font-weight: 600;
@@ -279,7 +286,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
         /* ===== NO BADGES - SAME AS INDEX ===== */
 
-        /* ===== LOGOUT LINK ===== */
         .logout-link {
             color:#b8c2cc !important;
         }
@@ -289,11 +295,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
             box-shadow:0 8px 20px rgba(220,38,38,.35) !important;
         }
 
-        /* ===== TOP BAR - SAME AS INDEX.PHP ===== */
+        /* ===== TOP BAR - NO SEARCH, NO BADGE ===== */
         .topbar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             gap: 20px;
             padding: 14px 32px;
             background: #fff;
@@ -302,20 +308,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             top:0;
             z-index:50;
         }
-        .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; }
-        .topbar-search { flex:1; max-width:500px; position:relative; }
-        .topbar-search input {
-            width:100%;
-            padding:9px 40px 9px 16px;
-            border-radius:10px;
-            border:1px solid #e9ecef;
-            background:#f8fafc;
-            font-size:14px;
-            outline:none;
-            transition:0.2s;
-        }
-        .topbar-search input:focus { border-color:#0E7A4E; background:#fff; }
-        .topbar-search svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:#adb5bd; }
+        .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; margin-right:auto; }
 
         .topbar-actions { display:flex; align-items:center; gap:16px; }
         .icon-btn {
@@ -334,14 +327,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
         }
         .icon-btn:hover { background:#e9ecef; }
         .icon-btn svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2; }
-        .icon-btn .count {
-            position:absolute; top:-4px; right:-4px;
-            background:#ef4444; color:#fff;
-            font-size:10px; font-weight:700;
-            min-width:18px; height:18px; border-radius:50%;
-            display:flex; align-items:center; justify-content:center;
-            border:2px solid #fff;
-        }
         .user-chip { display:flex; align-items:center; gap:10px; text-decoration:none; }
         .user-avatar {
             width:36px; height:36px; border-radius:10px;
@@ -405,6 +390,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             position: relative;
             text-decoration: none;
             color: inherit;
+            align-items: center;
         }
         .notification-item:hover {
             box-shadow: 0 4px 12px rgba(0,0,0,0.06);
@@ -477,6 +463,24 @@ $current_page = basename($_SERVER['PHP_SELF']);
             margin-top: 6px;
         }
 
+        /* Delete button */
+        .delete-notif {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 8px;
+            border-radius: 50%;
+            transition: 0.2s;
+            flex-shrink: 0;
+            margin-left: 8px;
+        }
+        .delete-notif:hover {
+            background: #fee2e2;
+            color: #ef4444;
+        }
+
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -500,6 +504,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
             font-size: 14px;
         }
 
+        /* Removing animation */
+        .notification-item.removing {
+            opacity: 0;
+            transform: translateX(30px);
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none;
+        }
+
         @media (max-width:1100px) {
             .sidebar { position:fixed; left:-280px; transition:left 0.3s; }
             .sidebar.open { left:0; }
@@ -508,17 +520,17 @@ $current_page = basename($_SERVER['PHP_SELF']);
         @media (max-width:768px) {
             .content-inner { padding:16px; }
             .topbar { padding:12px 16px; flex-wrap:wrap; }
-            .notification-item { padding:16px; }
+            .notification-item { padding:16px; flex-wrap:wrap; }
             .notif-icon { width:40px; height:40px; font-size:16px; border-radius:10px; }
             .page-header h1 { font-size:20px; }
-            .topbar-search { max-width:none; }
+            .delete-notif { padding:6px; }
         }
     </style>
 </head>
 <body>
 <div class="dashboard-wrapper">
 
-    <!-- ===== SIDEBAR - SAME AS INDEX.PHP (NO BADGES) ===== -->
+    <!-- ===== SIDEBAR - WITH WISHLIST ===== -->
     <aside class="sidebar" id="adminSidebar">
         <div class="logo">
             <a href="../index.php">
@@ -562,6 +574,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                     </svg>
                     Messages
+                </a>
+            </li>
+            <li>
+                <a href="wishlist.php" class="<?php echo ($current_page == 'wishlist.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                    Wishlist
                 </a>
             </li>
         </ul>
@@ -621,24 +641,17 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- ===== MAIN CONTENT ===== -->
     <div class="main-content">
 
-        <!-- TOP BAR - WITH BELL BADGE -->
+        <!-- TOP BAR - NO SEARCH, NO BADGE -->
         <header class="topbar">
             <button class="topbar-menu-btn" onclick="document.getElementById('adminSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
 
-            <div class="topbar-search">
-                <input type="text" placeholder="Search anything...">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </div>
-
             <div class="topbar-actions">
                 <button class="icon-btn" title="Notifications" onclick="window.location.href='notifications.php'">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                    <?php if ($unread_count > 0): ?>
-                        <span class="count"><?php echo $unread_count > 9 ? '9+' : $unread_count; ?></span>
-                    <?php endif; ?>
                 </button>
+
                 <a href="profile.php" class="user-chip">
                     <div class="user-avatar">
                         <?php if (!empty($profile_pic_path)): ?>
@@ -661,16 +674,18 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <div class="page-header">
                 <h1><i class="fas fa-bell"></i> Notifications</h1>
                 <?php if ($unread_count > 0): ?>
-                    <span class="header-badge"><?php echo $unread_count; ?> unread</span>
+                    <span class="header-badge" id="unreadBadge"><?php echo $unread_count; ?> unread</span>
                 <?php endif; ?>
             </div>
 
             <!-- Notifications List -->
             <?php if (!empty($notifications)): ?>
-                <div class="notifications-list">
+                <div class="notifications-list" id="notificationsList">
                     <?php foreach ($notifications as $notif): ?>
                         <?php $is_unread = !$notif['is_read']; ?>
-                        <a href="<?php echo $notif['link']; ?>" class="notification-item <?php echo $is_unread ? 'unread' : ''; ?>">
+                        <div class="notification-item <?php echo $is_unread ? 'unread' : ''; ?>" 
+                             data-type="<?php echo $notif['type']; ?>" 
+                             data-id="<?php echo $notif['id']; ?>">
                             <div class="notif-icon" style="background: <?php echo $notif['color']; ?>;">
                                 <i class="fas <?php echo $notif['icon']; ?>"></i>
                             </div>
@@ -686,7 +701,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             <?php if ($is_unread): ?>
                                 <div class="unread-dot"></div>
                             <?php endif; ?>
-                        </a>
+                            <button class="delete-notif" title="Delete notification" onclick="event.stopPropagation(); deleteNotification(this, '<?php echo $notif['type']; ?>', <?php echo $notif['id']; ?>)">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     <?php endforeach; ?>
                 </div>
             <?php else: ?>
@@ -702,12 +720,62 @@ $current_page = basename($_SERVER['PHP_SELF']);
 </div>
 
 <script>
-document.querySelectorAll('.notification-item').forEach(function(item) {
-    item.addEventListener('click', function(e) {
-        // Mark as read functionality could be added here
-        // For now, just navigate to the link
-    });
-});
+// ===== DELETE NOTIFICATION =====
+function deleteNotification(btn, type, id) {
+    if (!confirm('Are you sure you want to delete this notification?')) {
+        return;
+    }
+
+    const item = btn.closest('.notification-item');
+
+    fetch('delete-notification.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: 'type=' + encodeURIComponent(type) + '&id=' + encodeURIComponent(id)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Slide out and remove the notification item
+            item.classList.add('removing');
+            setTimeout(() => {
+                item.remove();
+
+                // Update unread badge count
+                const unreadBadge = document.getElementById('unreadBadge');
+                if (unreadBadge) {
+                    let count = parseInt(unreadBadge.textContent) || 0;
+                    if (item.classList.contains('unread')) {
+                        count--;
+                        if (count > 0) {
+                            unreadBadge.textContent = count + ' unread';
+                        } else {
+                            unreadBadge.remove();
+                        }
+                    }
+                }
+
+                // If no notifications left, show empty state
+                const list = document.getElementById('notificationsList');
+                if (list && list.children.length === 0) {
+                    list.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon"><i class="far fa-bell-slash"></i></div>
+                            <h3>No notifications yet</h3>
+                            <p>You'll see updates about new users, messages, and properties here.</p>
+                        </div>
+                    `;
+                }
+            }, 300);
+        } else {
+            alert(data.error || 'Failed to delete notification.');
+        }
+    })
+    .catch(() => alert('Network error. Please try again.'));
+}
 </script>
 
 </body>

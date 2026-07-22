@@ -687,35 +687,116 @@ function getPropertyImages($type, $id)
             font-size: 13px;
         }
 
-        /* Pagination */
+        /* ======================================================
+               PROFESSIONAL PAGINATION - NEW STYLES
+               ====================================================== */
         .pagination {
             display: flex;
             justify-content: center;
-            gap: 5px;
-            margin-top: 30px;
+            align-items: center;
+            gap: 6px;
+            margin-top: 35px;
             flex-wrap: wrap;
+            padding: 4px 0;
         }
+
         .pagination a,
         .pagination span {
-            padding: 7px 12px;
-            border: 1px solid #E5E7EB;
-            border-radius: 7px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 40px;
+            height: 40px;
+            padding: 0 12px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            background: #fff;
             text-decoration: none;
-            color: #111827;
-            font-size: 12px;
-            font-weight: 500;
-            transition: all 0.2s;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            user-select: none;
         }
+
         .pagination a:hover {
             background: #0E7A4E;
-            color: white;
+            color: #fff;
             border-color: #0E7A4E;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(14, 122, 78, 0.25);
         }
+
         .pagination .active {
             background: #0E7A4E;
-            color: white;
+            color: #fff;
             border-color: #0E7A4E;
+            box-shadow: 0 4px 14px rgba(14, 122, 78, 0.3);
+            font-weight: 700;
+        }
+
+        .pagination .ellipsis {
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            font-weight: 500;
+            min-width: auto;
+            padding: 0 4px;
+            cursor: default;
+            pointer-events: none;
+        }
+
+        .pagination .ellipsis:hover {
+            background: transparent;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* First, Last, Prev, Next buttons - slightly different styling */
+        .pagination .pagination-first,
+        .pagination .pagination-last,
+        .pagination .pagination-prev,
+        .pagination .pagination-next {
             font-weight: 600;
+            color: #0E7A4E;
+            border-color: #d1e6d8;
+            background: #f6fbf9;
+        }
+
+        .pagination .pagination-first:hover,
+        .pagination .pagination-last:hover,
+        .pagination .pagination-prev:hover,
+        .pagination .pagination-next:hover {
+            background: #0E7A4E;
+            color: #fff;
+            border-color: #0E7A4E;
+        }
+
+        /* Disabled state for First/Prev when on page 1, or Last/Next when on last page */
+        .pagination .disabled {
+            opacity: 0.4;
+            pointer-events: none;
+            cursor: default;
+            background: #f1f5f9;
+            color: #94a3b8;
+            border-color: #e2e8f0;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 600px) {
+            .pagination a,
+            .pagination span {
+                min-width: 34px;
+                height: 34px;
+                font-size: 12px;
+                padding: 0 8px;
+                border-radius: 8px;
+            }
+            .pagination .pagination-first,
+            .pagination .pagination-last {
+                display: none; /* Hide First/Last on mobile to save space */
+            }
         }
 
         /* Responsive */
@@ -897,23 +978,67 @@ function getPropertyImages($type, $id)
 
             <?php if ($total_pages > 1): ?>
                 <div class="pagination">
-                    <?php $params = $_GET;
-                    if ($page > 1):
-                        $params['page'] = $page - 1; ?>
-                        <a href="?<?php echo http_build_query($params); ?>">Previous</a>
-                    <?php endif;
-                    for ($i = 1; $i <= $total_pages; $i++):
-                        $params['page'] = $i; ?>
-                        <?php if ($i == $page): ?>
-                            <span class="active"><?php echo $i; ?></span>
-                        <?php else: ?>
-                            <a href="?<?php echo http_build_query($params); ?>"><?php echo $i; ?></a>
-                        <?php endif; ?>
-                    <?php endfor;
-                    if ($page < $total_pages):
-                        $params['page'] = $page + 1; ?>
-                        <a href="?<?php echo http_build_query($params); ?>">Next</a>
-                    <?php endif; ?>
+                    <?php
+                    $params = $_GET;
+                    $range = 2; // number of pages to show on each side of current page
+
+                    // First Page
+                    if ($page > 1) {
+                        $params['page'] = 1;
+                        echo '<a href="?' . http_build_query($params) . '" class="pagination-first">&laquo; First</a>';
+                    } else {
+                        echo '<span class="disabled pagination-first">&laquo; First</span>';
+                    }
+
+                    // Previous Page
+                    if ($page > 1) {
+                        $params['page'] = $page - 1;
+                        echo '<a href="?' . http_build_query($params) . '" class="pagination-prev">‹ Previous</a>';
+                    } else {
+                        echo '<span class="disabled pagination-prev">‹ Previous</span>';
+                    }
+
+                    // Page numbers with ellipsis
+                    for ($i = 1; $i <= $total_pages; $i++) {
+                        // Show current page, first, last, and pages within range
+                        if (
+                            $i == 1 ||
+                            $i == $total_pages ||
+                            ($i >= $page - $range && $i <= $page + $range)
+                        ) {
+                            if ($i == $page) {
+                                echo '<span class="active">' . $i . '</span>';
+                            } else {
+                                $params['page'] = $i;
+                                echo '<a href="?' . http_build_query($params) . '">' . $i . '</a>';
+                            }
+                        }
+                        // Show ellipsis after first page if gap exists
+                        elseif ($i == $page - $range - 1 && $i > 1) {
+                            echo '<span class="ellipsis">…</span>';
+                        }
+                        // Show ellipsis before last page if gap exists
+                        elseif ($i == $page + $range + 1 && $i < $total_pages) {
+                            echo '<span class="ellipsis">…</span>';
+                        }
+                    }
+
+                    // Next Page
+                    if ($page < $total_pages) {
+                        $params['page'] = $page + 1;
+                        echo '<a href="?' . http_build_query($params) . '" class="pagination-next">Next ›</a>';
+                    } else {
+                        echo '<span class="disabled pagination-next">Next ›</span>';
+                    }
+
+                    // Last Page
+                    if ($page < $total_pages) {
+                        $params['page'] = $total_pages;
+                        echo '<a href="?' . http_build_query($params) . '" class="pagination-last">Last &raquo;</a>';
+                    } else {
+                        echo '<span class="disabled pagination-last">Last &raquo;</span>';
+                    }
+                    ?>
                 </div>
             <?php endif; ?>
 

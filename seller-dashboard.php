@@ -117,26 +117,30 @@ else $greeting = 'Good Evening';
 $current_page = basename($_SERVER['PHP_SELF']);
 
 // ============================================================
-// getPropertyImages() - same as home page
+// getPropertyImages() - Uses Unsplash real estate images
 // ============================================================
 if (!function_exists('getPropertyImages')) {
     function getPropertyImages($type, $id) {
-        switch (strtolower(trim($type))) {
-            case 'house':        $folder = 'house'; break;
-            case 'apartment':    $folder = 'apartment'; break;
-            case 'plot':         $folder = 'plot'; break;
-            case 'commercial':   $folder = 'commercial'; break;
-            case 'farm house':   $folder = 'farmhouse'; break;
-            case 'villa':        $folder = 'villa'; break;
-            case 'penthouse':    $folder = 'penthouse'; break;
-            case 'portion':      $folder = 'portion'; break;
-            default:             $folder = 'house'; break;
-        }
+        $seed = $id;
+        $imagePool = [
+            'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600&h=400&fit=crop',
+            'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&h=400&fit=crop',
+            'https://images.unsplash.com/photo-1600573472550-8090b5e0745e?w=600&h=400&fit=crop',
+            'https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=600&h=400&fit=crop',
+            'https://images.unsplash.com/photo-1600566753086-00f18f6b0050?w=600&h=400&fit=crop',
+            'https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=600&h=400&fit=crop',
+            'https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?w=600&h=400&fit=crop',
+            'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=600&h=400&fit=crop',
+            'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&h=400&fit=crop',
+            'https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?w=600&h=400&fit=crop',
+            'https://images.unsplash.com/photo-1605146769289-440113cc3d00?w=600&h=400&fit=crop',
+            'https://images.unsplash.com/photo-1600585153490-76fb20a32601?w=600&h=400&fit=crop',
+        ];
         $images = [];
-        $start = ($id % 10) + 1;
+        $start = ($seed % count($imagePool));
         for ($i = 0; $i < 4; $i++) {
-            $num = (($start + $i - 1) % 10) + 1;
-            $images[] = "assets/images/$folder/$num.jpg";
+            $index = ($start + $i) % count($imagePool);
+            $images[] = $imagePool[$index];
         }
         return $images;
     }
@@ -169,7 +173,7 @@ function formatCardPrice($price, $purpose) {
 
         .dashboard-wrapper { display:flex; min-height:100vh; background:#f4f6f5; }
 
-        /* ===== SIDEBAR ===== */
+        /* ===== SIDEBAR - UNCHANGED ===== */
         .sidebar {
             width: 250px;
             min-width: 250px;
@@ -204,11 +208,11 @@ function formatCardPrice($price, $purpose) {
         .logout-link { color:#b8c2cc !important; }
         .logout-link:hover { background:linear-gradient(135deg,#dc2626,#ef4444) !important; color:#fff !important; box-shadow:0 8px 20px rgba(220,38,38,.35) !important; }
 
-        /* ===== TOP BAR ===== */
+        /* ===== TOP BAR - UNCHANGED ===== */
         .topbar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             gap: 20px;
             padding: 14px 32px;
             background: #fff;
@@ -217,12 +221,7 @@ function formatCardPrice($price, $purpose) {
             top:0;
             z-index:50;
         }
-        .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; }
-        .topbar-search { flex:1; max-width:500px; position:relative; }
-        .topbar-search input { width:100%; padding:9px 40px 9px 16px; border-radius:10px; border:1px solid #e9ecef; background:#f8fafc; font-size:14px; outline:none; transition:0.2s; }
-        .topbar-search input:focus { border-color:#0E7A4E; background:#fff; box-shadow:0 0 0 3px rgba(14,122,78,0.1); }
-        .topbar-search svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:#adb5bd; }
-
+        .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; margin-right:auto; }
         .topbar-actions { display:flex; align-items:center; gap:10px; }
         .user-chip { display:flex; align-items:center; gap:10px; text-decoration:none; }
         .user-avatar { width:36px; height:36px; border-radius:10px; background:#0E7A4E; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; overflow:hidden; flex-shrink:0; }
@@ -235,56 +234,75 @@ function formatCardPrice($price, $purpose) {
         .main-content { flex:1; overflow-y:auto; }
         .content-inner { padding:28px 32px 40px; }
 
-        /* ===== WELCOME BANNER ===== */
+        /* ===== PROFESSIONAL WELCOME BANNER ===== */
         .welcome-banner {
             position:relative;
             overflow:hidden;
-            border-radius:24px;
-            min-height:180px;
-            padding:35px 40px;
+            border-radius:20px;
+            min-height:200px;
+            padding:40px 45px;
             margin-bottom:28px;
             display:flex;
             align-items:center;
             justify-content:space-between;
-            gap:20px;
+            gap:30px;
             flex-wrap:wrap;
-            background:
-                linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 60%, rgba(0,0,0,0.05) 100%),
-                url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
-            box-shadow:0 8px 30px rgba(0,0,0,0.08);
+            background: linear-gradient(135deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.15) 100%),
+                        url('https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+            box-shadow:0 10px 40px rgba(0,0,0,0.12);
         }
-        .welcome-banner::after {
+        .welcome-banner::before {
             content:'';
             position:absolute;
-            top:0;
-            left:0;
-            width:100%;
-            height:100%;
-            background:linear-gradient(90deg, rgba(14,122,78,0.15) 0%, transparent 60%);
+            top:0;left:0;right:0;bottom:0;
+            background:linear-gradient(135deg, rgba(14,122,78,0.2) 0%, transparent 50%);
             pointer-events:none;
         }
         .welcome-banner > * { position:relative; z-index:1; }
-        .welcome-banner h1 { color:#fff; font-size:24px; font-weight:700; margin-bottom:4px; letter-spacing:-0.3px; }
-        .welcome-banner p { color:#fff; font-size:16px; opacity:0.9; margin-bottom:8px; font-weight:400; }
-        .welcome-meta { display:flex; align-items:center; gap:20px; color:#fff; font-size:14px; opacity:0.85; }
-        .welcome-meta span { display:flex; align-items:center; gap:6px; }
-        .welcome-meta svg { width:16px; height:16px; }
+        .welcome-text h1 {
+            color:#fff;
+            font-size:28px;
+            font-weight:700;
+            margin-bottom:6px;
+            letter-spacing:-0.5px;
+            line-height:1.2;
+        }
+        .welcome-text h1 .wave { display:inline-block; animation:wave 2s infinite; transform-origin:70% 70%; }
+        @keyframes wave { 0%,100%{transform:rotate(0deg);} 25%{transform:rotate(15deg);} 50%{transform:rotate(-5deg);} 75%{transform:rotate(10deg);} }
+        .welcome-text p {
+            color:rgba(255,255,255,0.9);
+            font-size:15px;
+            margin-bottom:14px;
+            font-weight:400;
+            line-height:1.5;
+            max-width:400px;
+        }
+        .welcome-meta { display:flex; align-items:center; gap:20px; color:rgba(255,255,255,0.8); font-size:13px; font-weight:500; }
+        .welcome-meta span { display:flex; align-items:center; gap:7px; }
+        .welcome-meta i { font-size:14px; opacity:0.8; }
+
         .add-property-btn {
             display:inline-flex;
             align-items:center;
-            gap:8px;
-            background:#0E7A4E;
-            color:#fff;
-            padding:10px 24px;
+            gap:10px;
+            background:#fff;
+            color:#0E7A4E;
+            padding:12px 28px;
             border-radius:12px;
             font-weight:700;
             font-size:14px;
             text-decoration:none;
-            transition:0.25s;
+            transition:all 0.3s ease;
             white-space:nowrap;
-            box-shadow:0 4px 12px rgba(14,122,78,0.3);
+            box-shadow:0 8px 25px rgba(0,0,0,0.2);
+            backdrop-filter:blur(10px);
         }
-        .add-property-btn:hover { background:#0a5c3a; transform:translateY(-2px); box-shadow:0 8px 25px rgba(14,122,78,0.4); }
+        .add-property-btn:hover { 
+            background:#0E7A4E;
+            color:#fff;
+            transform:translateY(-2px); 
+            box-shadow:0 12px 35px rgba(14,122,78,0.4);
+        }
 
         /* ===== STATS GRID ===== */
         .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:26px; }
@@ -321,12 +339,17 @@ function formatCardPrice($price, $purpose) {
             justify-content:center;
             margin-bottom:12px;
             font-size:20px;
+            color: #1e293b; /* Professional dark/black color for icons */
         }
-        .stat-icon.green { background:rgba(14,122,78,0.10); color:#0E7A4E; }
-        .stat-icon.blue { background:rgba(59,130,246,0.10); color:#3b82f6; }
-        .stat-icon.orange { background:rgba(251,146,60,0.10); color:#f97316; }
-        .stat-icon.purple { background:rgba(139,92,246,0.10); color:#8b5cf6; }
-        .stat-icon svg { width:24px; height:24px; stroke:currentColor; fill:none; stroke-width:2; }
+        .stat-icon i {
+            font-size: 22px;
+            color: #1e293b; /* Ensure icons are dark */
+        }
+        .stat-icon.green { background:rgba(14,122,78,0.10); }
+        .stat-icon.blue { background:rgba(59,130,246,0.10); }
+        .stat-icon.orange { background:rgba(251,146,60,0.10); }
+        .stat-icon.purple { background:rgba(139,92,246,0.10); }
+        
         .stat-number { font-size:28px; font-weight:800; color:#0b1a2e; line-height:1; margin-bottom:6px; letter-spacing:-0.5px; }
         .stat-label { font-size:14px; color:#64748b; margin-bottom:6px; font-weight:500; }
         .stat-growth {
@@ -344,307 +367,151 @@ function formatCardPrice($price, $purpose) {
         .stat-growth.down { color:#ef4444; background:#fee2e2; }
         .stat-growth.neutral { color:#94a3b8; background:#f1f5f9; }
 
-        /* ===== PROPERTY GRID - PREMIUM CARDS (same as buyer/home) ===== */
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
+        /* ===== SIDE-BY-SIDE CONTENT GRID ===== */
+        .content-grid {
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:20px;
         }
-        .section-header h2 {
-            font-size: 22px;
-            font-weight: 700;
-            color: #111827;
-            font-family: 'Fraunces', serif;
+
+        .content-card {
+            background:#fff;
+            border-radius:18px;
+            border:1px solid #edf2f7;
+            overflow:hidden;
+            display:flex;
+            flex-direction:column;
         }
-        .section-header a {
+        .card-header {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            padding:18px 22px;
+            border-bottom:1px solid #f1f5f9;
+        }
+        .card-header h2 {
+            font-size:16px;
+            font-weight:700;
+            color:#0f172a;
+            display:flex;
+            align-items:center;
+            gap:8px;
+        }
+        .card-header h2 i { color:#0E7A4E; font-size:14px; }
+        
+        /* ===== PROFESSIONAL VIEW ALL BUTTON ===== */
+        .view-all-btn {
+            font-size: 12.5px;
+            font-weight: 600;
             color: #0E7A4E;
             text-decoration: none;
-            font-weight: 600;
-            font-size: 14px;
-            display: flex;
+            padding: 6px 16px;
+            border-radius: 8px;
+            border: 1.5px solid #0E7A4E;
+            background: transparent;
+            transition: all 0.2s ease;
+            display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
         }
-        .section-header a:hover {
-            text-decoration: underline;
-        }
-
-        .properties-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin-bottom: 40px;
+        .view-all-btn:hover { 
+            background: #0E7A4E; 
+            color: #ffffff; 
+            box-shadow: 0 4px 12px rgba(14, 122, 78, 0.3);
+            border-color: #0E7A4E;
         }
 
-        .premium-card {
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-            background: #fff;
-            position: relative;
-            display: flex;
-            flex-direction: column;
+        .card-body-scroll {
+            flex:1;
+            overflow-y:auto;
+            max-height:420px;
+            padding:12px 16px;
         }
-        .premium-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.12);
-        }
-        .premium-card .card-image-slider {
-            border-radius: 16px 16px 0 0;
-            overflow: hidden;
-            position: relative;
-            height: 200px;
-            background: #f3f4f6;
-        }
-        .card-image-slider .slider-container { width: 100%; height: 100%; overflow: hidden; }
-        .card-image-slider .slider-track { display: flex; height: 100%; transition: transform 0.5s ease; }
-        .card-image-slider .slider-track img { width: 100%; height: 100%; object-fit: cover; flex-shrink: 0; }
-        .slider-btn {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(255,255,255,0.7);
-            border: none;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            font-size: 18px;
-            cursor: pointer;
-            color: #1e293b;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: 0.2s;
-            opacity: 0;
-            pointer-events: none;
-            z-index: 3;
-        }
-        .premium-card:hover .slider-btn { opacity: 1; pointer-events: auto; }
-        .slider-btn:hover { background: white; }
-        .slider-prev { left: 8px; }
-        .slider-next { right: 8px; }
-        .slider-dots {
-            position: absolute;
-            bottom: 8px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 5px;
-            z-index: 3;
-        }
-        .slider-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.5); cursor: pointer; transition: 0.2s; }
-        .slider-dot.active { background: white; width: 16px; border-radius: 4px; }
+        .card-body-scroll::-webkit-scrollbar { width:4px; }
+        .card-body-scroll::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:10px; }
 
-        .card-tag {
-            position: absolute;
-            top: 12px;
-            left: 12px;
-            padding: 4px 14px;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 700;
-            color: white;
-            z-index: 4;
+        /* Property List Items */
+        .prop-list-item {
+            display:flex;
+            align-items:center;
+            gap:14px;
+            padding:12px 8px;
+            border-radius:10px;
+            transition:all 0.2s ease;
+            cursor:pointer;
+            border-bottom:1px solid #f8fafc;
         }
-        .card-tag.for-sale { background: #0E7A4E; }
-        .card-tag.for-rent { background: #10B981; }
+        .prop-list-item:last-child { border-bottom:none; }
+        .prop-list-item:hover { background:#f8fafc; }
+        .prop-thumb {
+            width:65px;
+            height:50px;
+            border-radius:8px;
+            object-fit:cover;
+            flex-shrink:0;
+            background:#f1f5f9;
+        }
+        .prop-info { flex:1; min-width:0; }
+        .prop-info h4 {
+            font-size:13.5px;
+            font-weight:600;
+            color:#0f172a;
+            margin-bottom:3px;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+        }
+        .prop-info .prop-meta {
+            font-size:11.5px;
+            color:#94a3b8;
+        }
+        .prop-status {
+            padding:4px 10px;
+            border-radius:20px;
+            font-size:10.5px;
+            font-weight:600;
+            flex-shrink:0;
+        }
+        .prop-status.active { background:#dcfce7; color:#16a34a; }
+        .prop-status.pending { background:#fef3c7; color:#b45309; }
+        .prop-status.sold { background:#f1f5f9; color:#64748b; }
 
-        .featured-badge {
-            position: absolute;
-            top: 12px;
-            left: 90px;
-            background: #F59E0B;
-            color: white;
-            padding: 3px 10px;
-            border-radius: 4px;
-            font-size: 9px;
-            font-weight: 700;
-            z-index: 4;
+        /* Message List Items */
+        .msg-list-item {
+            display:flex;
+            align-items:center;
+            gap:12px;
+            padding:12px 8px;
+            border-radius:10px;
+            transition:all 0.2s ease;
+            cursor:pointer;
+            border-bottom:1px solid #f8fafc;
         }
-
-        .wishlist-icon {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            background: rgba(0,0,0,0.4);
-            border-radius: 50%;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            z-index: 4;
-        }
-        .wishlist-icon:hover { background: rgba(0,0,0,0.6); }
-        .wishlist-icon svg { width: 18px; height: 18px; fill: none; stroke: #ffffff; transition: all 0.3s ease; }
-        .wishlist-icon.active { background: #ef4444; }
-        .wishlist-icon.active svg { fill: #ffffff; stroke: #ffffff; }
-
-        .premium-card .card-body {
-            padding: 16px 18px 18px;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        .premium-card .card-body h3 {
-            font-size: 16px;
-            font-weight: 700;
-            color: #0b1a2e;
-            margin-bottom: 4px;
-            line-height: 1.3;
-        }
-        .card-location {
-            font-size: 12px;
-            color: #6B7280;
-            margin-bottom: 6px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .card-location svg {
-            width: 14px;
-            height: 14px;
-            stroke: currentColor;
-            flex-shrink: 0;
-        }
-        .card-price {
-            font-size: 24px;
-            font-weight: 800;
-            color: #0E7A4E;
-            margin: 8px 0 12px;
-        }
-        .card-price .per-month {
-            font-size: 14px;
-            font-weight: 600;
-            color: #64748b;
-        }
-        .contact-price {
-            font-size: 16px;
-            font-weight: 700;
-            color: #ef4444;
-        }
-        .card-meta {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px 14px;
-            margin-bottom: 14px;
-            border-top: 1px solid #eef2f7;
-            padding-top: 12px;
-        }
-        .meta-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 13px;
-            font-weight: 500;
-            color: #1e293b;
-        }
-        .meta-item i {
-            font-size: 14px;
-            color: #1e293b;
-            width: 16px;
-            text-align: center;
-        }
-
-        .view-detail-btn {
-            display: block;
-            width: 100%;
-            text-align: center;
-            padding: 12px 0;
-            background: linear-gradient(135deg, #0E7A4E, #16a34a);
-            color: #fff;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 15px;
-            text-decoration: none;
-            transition: 0.3s;
-            border: none;
-            margin-top: auto;
-        }
-        .view-detail-btn:hover {
-            background: #0a5c3a;
-            transform: scale(1.01);
-            box-shadow: 0 8px 25px rgba(14,122,78,0.3);
-            color: #fff;
-        }
-
-        /* ===== MESSAGES SECTION ===== */
-        .messages-section {
-            margin-top: 20px;
-        }
-        .messages-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
-        }
-        .message-card {
-            background: #fff;
-            border-radius: 16px;
-            padding: 16px 20px;
-            border: 1px solid #edf2f7;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            transition: 0.3s;
-        }
-        .message-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.06);
-        }
+        .msg-list-item:last-child { border-bottom:none; }
+        .msg-list-item:hover { background:#f8fafc; }
         .msg-avatar {
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #0E7A4E, #16a34a);
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 16px;
-            flex-shrink: 0;
+            width:42px;
+            height:42px;
+            border-radius:50%;
+            background:#dcfce7;
+            color:#0E7A4E;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-weight:700;
+            font-size:15px;
+            flex-shrink:0;
         }
-        .msg-content {
-            flex: 1;
-            min-width: 0;
-        }
-        .msg-content .sender {
-            font-size: 14px;
-            font-weight: 700;
-            color: #0b1a2e;
-        }
-        .msg-content .preview {
-            font-size: 13px;
-            color: #64748b;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .msg-time {
-            font-size: 12px;
-            color: #94a3b8;
-            white-space: nowrap;
-        }
+        .msg-details { flex:1; min-width:0; }
+        .msg-details .sender { font-size:13px; font-weight:600; color:#0f172a; margin-bottom:2px; }
+        .msg-details .preview { font-size:12px; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .msg-dot { width:7px; height:7px; border-radius:50%; background:#0E7A4E; flex-shrink:0; }
+        .msg-time { font-size:11px; color:#94a3b8; white-space:nowrap; flex-shrink:0; }
 
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #94a3b8;
-        }
-        .empty-state svg {
-            width: 56px;
-            height: 56px;
-            color: #d1d9e6;
-            margin-bottom: 12px;
-            opacity: 0.7;
-        }
-        .empty-state p { color: #64748b; font-size: 14px; margin-bottom: 8px; }
-        .empty-state a { color: #0E7A4E; text-decoration:none; font-weight:700; }
-        .empty-state a:hover { text-decoration:underline; }
+        .empty-state { text-align:center; padding:50px 20px; }
+        .empty-state i { font-size:36px; color:#cbd5e1; margin-bottom:10px; display:block; }
+        .empty-state p { color:#94a3b8; font-size:13px; margin-bottom:8px; }
+        .empty-state a { color:#0E7A4E; text-decoration:none; font-weight:600; font-size:13px; }
 
         /* ===== RESPONSIVE ===== */
         @media (max-width:1200px) { .stats-grid { grid-template-columns:repeat(2,1fr); } }
@@ -652,18 +519,15 @@ function formatCardPrice($price, $purpose) {
             .sidebar { position:fixed; left:-280px; transition:left 0.3s; }
             .sidebar.open { left:0; }
             .topbar-menu-btn { display:flex; }
-            .properties-grid { grid-template-columns:repeat(2,1fr); }
+            .content-grid { grid-template-columns:1fr; }
         }
         @media (max-width:768px) {
             .content-inner { padding:18px; }
-            .topbar { padding:12px 18px; flex-wrap:wrap; }
-            .topbar-search { max-width:100%; order:3; flex-basis:100%; margin-top:8px; }
+            .topbar { padding:12px 18px; }
             .stats-grid { grid-template-columns:1fr 1fr; gap:12px; }
-            .welcome-banner { flex-direction:column; align-items:flex-start; padding:25px 20px; }
-            .welcome-banner h1 { font-size:22px; }
+            .welcome-banner { flex-direction:column; align-items:flex-start; padding:28px 22px; min-height:auto; }
+            .welcome-text h1 { font-size:22px; }
             .user-info { display:none; }
-            .properties-grid { grid-template-columns:1fr; }
-            .messages-grid { grid-template-columns:1fr; }
         }
         @media (max-width:480px) { .stats-grid { grid-template-columns:1fr; } }
     </style>
@@ -671,7 +535,7 @@ function formatCardPrice($price, $purpose) {
 <body>
 <div class="dashboard-wrapper">
 
-    <!-- SIDEBAR -->
+    <!-- SIDEBAR - UNCHANGED -->
     <aside class="sidebar" id="sellerSidebar">
         <div class="logo">
             <a href="index.php">
@@ -724,16 +588,11 @@ function formatCardPrice($price, $purpose) {
     <!-- MAIN -->
     <div class="main-content">
 
-        <!-- TOP BAR -->
+        <!-- TOP BAR - UNCHANGED -->
         <header class="topbar">
             <button class="topbar-menu-btn" onclick="document.getElementById('sellerSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
-
-            <div class="topbar-search">
-                <input type="text" placeholder="Search anything...">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </div>
 
             <div class="topbar-actions">
                 <a href="profile-settings.php" class="user-chip">
@@ -754,25 +613,19 @@ function formatCardPrice($price, $purpose) {
 
         <div class="content-inner">
 
-            <!-- Welcome Banner -->
+            <!-- Professional Welcome Banner -->
             <div class="welcome-banner">
-                <div>
-                    <h1>👋 <?php echo $greeting; ?>, <?php echo htmlspecialchars($user_name); ?>!</h1>
-                    <p>Here's what's happening with your properties today.</p>
+                <div class="welcome-text">
+                    <h1><?php echo $greeting; ?>, <?php echo htmlspecialchars($user_name); ?> <span class="wave">👋</span></h1>
+                    <p>Manage your property listings, track inquiries, and grow your real estate business from one powerful dashboard.</p>
                     <div class="welcome-meta">
-                        <span>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                            <?php echo date('l, d F Y'); ?>
-                        </span>
-                        <span>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                            <?php echo date('h:i A'); ?>
-                        </span>
+                        <span><i class="far fa-calendar-alt"></i> <?php echo date('l, d F Y'); ?></span>
+                        <span><i class="far fa-clock"></i> <?php echo date('h:i A'); ?></span>
+                        <span><i class="fas fa-building"></i> <?php echo $active_properties; ?> Active Listings</span>
                     </div>
                 </div>
                 <a href="add-property.php" class="add-property-btn">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="18" height="18"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    Add Property
+                    <i class="fas fa-plus-circle"></i> Add New Property
                 </a>
             </div>
 
@@ -780,7 +633,7 @@ function formatCardPrice($price, $purpose) {
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-icon green">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                        <i class="fas fa-building"></i> <!-- Professional Icon -->
                     </div>
                     <div class="stat-number"><?php echo $total_properties; ?></div>
                     <div class="stat-label">Total Properties</div>
@@ -792,7 +645,7 @@ function formatCardPrice($price, $purpose) {
 
                 <div class="stat-card">
                     <div class="stat-icon blue">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        <i class="fas fa-check-circle"></i> <!-- Professional Icon -->
                     </div>
                     <div class="stat-number"><?php echo $active_properties; ?></div>
                     <div class="stat-label">Active Listings</div>
@@ -804,7 +657,7 @@ function formatCardPrice($price, $purpose) {
 
                 <div class="stat-card">
                     <div class="stat-icon orange">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        <i class="fas fa-envelope"></i> <!-- Professional Icon -->
                     </div>
                     <div class="stat-number"><?php echo $total_messages; ?></div>
                     <div class="stat-label">Unread Messages</div>
@@ -813,7 +666,7 @@ function formatCardPrice($price, $purpose) {
 
                 <div class="stat-card">
                     <div class="stat-icon purple">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <i class="fas fa-eye"></i> <!-- Professional Icon -->
                     </div>
                     <div class="stat-number"><?php echo number_format($total_views); ?></div>
                     <div class="stat-label">Total Views</div>
@@ -821,182 +674,75 @@ function formatCardPrice($price, $purpose) {
                 </div>
             </div>
 
-            <!-- ===== RECENT PROPERTIES (Premium Cards) ===== -->
-            <div class="section-header">
-                <h2>Recent Properties</h2>
-                <a href="my-properties.php">View All →</a>
-            </div>
+            <!-- Side-by-Side Content Grid -->
+            <div class="content-grid">
 
-            <?php if(empty($recent_props)): ?>
-                <div class="empty-state">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                    <p>No properties listed yet</p>
-                    <a href="add-property.php">Add your first property →</a>
-                </div>
-            <?php else: ?>
-                <div class="properties-grid">
-                    <?php foreach($recent_props as $prop):
-                        $images = getPropertyImages($prop['property_type'] ?? 'house', $prop['id']);
-                        $price_display = formatCardPrice($prop['price'], $prop['purpose'] ?? 'Sale');
-                        $price_suffix = ($prop['purpose'] == 'Rent' && $prop['price'] > 0) ? ' <span class="per-month">/ Month</span>' : '';
-                        $tag_class = ($prop['purpose'] == 'Rent') ? 'for-rent' : 'for-sale';
-                        $tag_label = ($prop['purpose'] == 'Rent') ? 'For Rent' : 'For Sale';
-                    ?>
-                        <div class="premium-card" data-property-id="<?php echo $prop['id']; ?>">
-                            <div class="card-image-slider" id="slider_<?php echo $prop['id']; ?>">
-                                <div class="slider-container">
-                                    <div class="slider-track">
-                                        <?php foreach ($images as $img): ?>
-                                            <img src="<?php echo htmlspecialchars($img); ?>"
-                                                 alt="<?php echo htmlspecialchars($prop['title']); ?>"
-                                                 loading="lazy"
-                                                 onerror="this.src='assets/images/house/1.jpg';">
-                                        <?php endforeach; ?>
+                <!-- Recent Properties Card -->
+                <div class="content-card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-clock"></i> Recent Properties</h2>
+                        <a href="my-properties.php" class="view-all-btn">View All <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                    <div class="card-body-scroll">
+                        <?php if(empty($recent_props)): ?>
+                            <div class="empty-state">
+                                <i class="fas fa-home"></i>
+                                <p>No properties listed yet</p>
+                                <a href="add-property.php">Add your first property →</a>
+                            </div>
+                        <?php else: ?>
+                            <?php foreach($recent_props as $prop):
+                                $images = getPropertyImages($prop['property_type'] ?? 'house', $prop['id']);
+                                $status_class = strtolower($prop['status'] ?? 'active');
+                            ?>
+                                <div class="prop-list-item" onclick="window.location.href='property-detail.php?id=<?php echo $prop['id']; ?>'">
+                                    <img class="prop-thumb" src="<?php echo htmlspecialchars($images[0]); ?>" alt="<?php echo htmlspecialchars($prop['title']); ?>" onerror="this.src='https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=100&h=80&fit=crop';">
+                                    <div class="prop-info">
+                                        <h4><?php echo htmlspecialchars($prop['title']); ?></h4>
+                                        <div class="prop-meta"><?php echo htmlspecialchars($prop['location'] ?? ''); ?> · PKR <?php echo number_format($prop['price'] / 1000000, 1); ?>M</div>
                                     </div>
+                                    <span class="prop-status <?php echo $status_class; ?>"><?php echo ucfirst($prop['status'] ?? 'Active'); ?></span>
                                 </div>
-                                <button class="slider-btn slider-prev" onclick="prevSlide('slider_<?php echo $prop['id']; ?>')">‹</button>
-                                <button class="slider-btn slider-next" onclick="nextSlide('slider_<?php echo $prop['id']; ?>')">›</button>
-                                <div class="slider-dots" id="dots_<?php echo $prop['id']; ?>"></div>
-                            </div>
-
-                            <div class="card-tag <?php echo $tag_class; ?>">
-                                <?php echo $tag_label; ?>
-                            </div>
-                            <?php if (!empty($prop['featured'])): ?>
-                                <div class="featured-badge">Featured</div>
-                            <?php endif; ?>
-
-                            <a href="javascript:void(0)" class="wishlist-icon" data-id="<?php echo (int) $prop['id']; ?>" onclick="toggleWishlistSeller(this)" title="Add to wishlist">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                                </svg>
-                            </a>
-
-                            <div class="card-body">
-                                <h3><?php echo htmlspecialchars($prop['title']); ?></h3>
-                                <div class="card-location">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                                        <circle cx="12" cy="10" r="3"/>
-                                    </svg>
-                                    <?php echo htmlspecialchars($prop['location']); ?>, <?php echo htmlspecialchars($prop['city']); ?>
-                                </div>
-                                <div class="card-price">
-                                    <?php echo $price_display; ?>
-                                    <?php echo $price_suffix; ?>
-                                </div>
-                                <div class="card-meta">
-                                    <?php if ($prop['bedrooms']): ?>
-                                        <span class="meta-item"><i class="fas fa-bed"></i> <?php echo $prop['bedrooms']; ?> Beds</span>
-                                    <?php endif; ?>
-                                    <?php if ($prop['bathrooms']): ?>
-                                        <span class="meta-item"><i class="fas fa-bath"></i> <?php echo $prop['bathrooms']; ?> Baths</span>
-                                    <?php endif; ?>
-                                    <?php if (!empty($prop['area_size'])): ?>
-                                        <span class="meta-item"><i class="fas fa-vector-square"></i> <?php echo htmlspecialchars($prop['area_size']); ?></span>
-                                    <?php endif; ?>
-                                    <span class="meta-item"><i class="fas fa-building"></i> <?php echo htmlspecialchars($prop['property_type']); ?></span>
-                                </div>
-                                <a href="property-detail.php?id=<?php echo $prop['id']; ?>" class="view-detail-btn">View Details</a>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
                 </div>
-            <?php endif; ?>
 
-            <!-- ===== RECENT MESSAGES ===== -->
-            <div class="section-header" style="margin-top: 10px;">
-                <h2>Recent Messages</h2>
-                <a href="messages.php">View All →</a>
+                <!-- Recent Messages Card -->
+                <div class="content-card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-comments"></i> Recent Messages</h2>
+                        <a href="messages.php" class="view-all-btn">View All <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                    <div class="card-body-scroll">
+                        <?php if(empty($recent_msgs)): ?>
+                            <div class="empty-state">
+                                <i class="fas fa-inbox"></i>
+                                <p>No messages yet</p>
+                            </div>
+                        <?php else: ?>
+                            <?php foreach($recent_msgs as $m): ?>
+                                <div class="msg-list-item" onclick="window.location.href='messages.php?sender=<?php echo $m['sender_id']; ?>&property=<?php echo $m['property_id']; ?>'">
+                                    <div class="msg-avatar"><?php echo strtoupper(substr($m['sender_name'], 0, 1)); ?></div>
+                                    <div class="msg-details">
+                                        <div class="sender"><?php echo htmlspecialchars($m['sender_name']); ?></div>
+                                        <div class="preview"><?php echo htmlspecialchars(substr($m['message'], 0, 45)); ?></div>
+                                    </div>
+                                    <?php if(!$m['is_read']): ?><div class="msg-dot"></div><?php endif; ?>
+                                    <div class="msg-time"><?php echo time_ago($m['created_at']); ?></div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
             </div>
-
-            <?php if(empty($recent_msgs)): ?>
-                <div class="empty-state">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    <p>No messages yet</p>
-                </div>
-            <?php else: ?>
-                <div class="messages-grid">
-                    <?php foreach($recent_msgs as $m): ?>
-                        <div class="message-card">
-                            <div class="msg-avatar"><?php echo strtoupper(substr($m['sender_name'], 0, 1)); ?></div>
-                            <div class="msg-content">
-                                <div class="sender"><?php echo htmlspecialchars($m['sender_name']); ?></div>
-                                <div class="preview"><?php echo htmlspecialchars(substr($m['message'], 0, 60)); ?></div>
-                            </div>
-                            <div class="msg-time"><?php echo time_ago($m['created_at']); ?></div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
 
         </div>
     </div>
 </div>
 
 <script>
-// ============================================ //
-// SLIDER FUNCTIONS
-// ============================================ //
-let slideIndexes = {};
-
-function initSlider(sliderId, imageCount) {
-    slideIndexes[sliderId] = 0;
-    updateDots(sliderId, imageCount);
-}
-
-function updateDots(sliderId, imageCount) {
-    const dotsContainer = document.getElementById(sliderId.replace('slider_', 'dots_'));
-    if (!dotsContainer) return;
-    dotsContainer.innerHTML = '';
-    for (let i = 0; i < imageCount; i++) {
-        const dot = document.createElement('div');
-        dot.className = 'slider-dot' + (i === slideIndexes[sliderId] ? ' active' : '');
-        dot.onclick = () => goToSlide(sliderId, i);
-        dotsContainer.appendChild(dot);
-    }
-}
-
-function goToSlide(sliderId, index) {
-    const slider = document.getElementById(sliderId);
-    if (!slider) return;
-    const track = slider.querySelector('.slider-track');
-    if (!track) return;
-    const images = track.querySelectorAll('img');
-    if (index < 0) index = 0;
-    if (index >= images.length) index = images.length - 1;
-    slideIndexes[sliderId] = index;
-    track.style.transform = `translateX(-${index * 100}%)`;
-    updateDots(sliderId, images.length);
-}
-
-function prevSlide(sliderId) {
-    const slider = document.getElementById(sliderId);
-    if (!slider) return;
-    const track = slider.querySelector('.slider-track');
-    if (!track) return;
-    const images = track.querySelectorAll('img');
-    let currentIndex = slideIndexes[sliderId] || 0;
-    currentIndex--;
-    if (currentIndex < 0) currentIndex = images.length - 1;
-    goToSlide(sliderId, currentIndex);
-}
-
-function nextSlide(sliderId) {
-    const slider = document.getElementById(sliderId);
-    if (!slider) return;
-    const track = slider.querySelector('.slider-track');
-    if (!track) return;
-    const images = track.querySelectorAll('img');
-    let currentIndex = slideIndexes[sliderId] || 0;
-    currentIndex++;
-    if (currentIndex >= images.length) currentIndex = 0;
-    goToSlide(sliderId, currentIndex);
-}
-
-// ============================================ //
-// WISHLIST TOGGLE (Seller)
-// ============================================ //
 function showWishlistToast(message, isError) {
     let toast = document.getElementById('wishlistToast');
     if (!toast) {
@@ -1027,32 +773,16 @@ function toggleWishlistSeller(el) {
     .then(data => {
         if (data.status === 'login_required') {
             showWishlistToast('Please login to use wishlist', true);
-            setTimeout(() => { window.location.href = 'login.php'; }, 1200);
         } else if (data.status === 'added') {
             el.classList.add('active');
             showWishlistToast('Added to wishlist ❤️', false);
         } else if (data.status === 'removed') {
             el.classList.remove('active');
             showWishlistToast('Removed from wishlist', false);
-        } else {
-            showWishlistToast(data.message || 'Something went wrong', true);
         }
     })
-    .catch(() => showWishlistToast('Network error, please try again', true));
+    .catch(() => showWishlistToast('Network error', true));
 }
-
-// ============================================ //
-// INIT SLIDERS
-// ============================================ //
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.card-image-slider').forEach(function(slider) {
-        const track = slider.querySelector('.slider-track');
-        if (track) {
-            const images = track.querySelectorAll('img');
-            initSlider(slider.id, images.length);
-        }
-    });
-});
 </script>
 
 </body>

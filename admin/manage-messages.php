@@ -285,7 +285,7 @@ if (!empty($found)) {
         .topbar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             gap: 20px;
             padding: 14px 32px;
             background: #fff;
@@ -295,19 +295,6 @@ if (!empty($found)) {
             z-index:50;
         }
         .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; }
-        .topbar-search { flex:1; max-width:500px; position:relative; }
-        .topbar-search input {
-            width:100%;
-            padding:9px 40px 9px 16px;
-            border-radius:10px;
-            border:1px solid #e9ecef;
-            background:#f8fafc;
-            font-size:14px;
-            outline:none;
-            transition:0.2s;
-        }
-        .topbar-search input:focus { border-color:#0E7A4E; background:#fff; }
-        .topbar-search svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:#adb5bd; }
 
         .topbar-actions { display:flex; align-items:center; gap:16px; }
         .icon-btn {
@@ -905,11 +892,6 @@ if (!empty($found)) {
             <button class="topbar-menu-btn" onclick="document.getElementById('adminSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
-
-            <div class="topbar-search">
-                <input type="text" placeholder="Search anything...">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </div>
 
             <div class="topbar-actions">
                 <!-- Notification bell (no count) -->

@@ -260,7 +260,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .topbar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             gap: 20px;
             padding: 14px 32px;
             background: #fff;
@@ -270,19 +270,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             z-index:50;
         }
         .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; }
-        .topbar-search { flex:1; max-width:500px; position:relative; }
-        .topbar-search input {
-            width:100%;
-            padding:9px 40px 9px 16px;
-            border-radius:10px;
-            border:1px solid #e9ecef;
-            background:#f8fafc;
-            font-size:14px;
-            outline:none;
-            transition:0.2s;
-        }
-        .topbar-search input:focus { border-color:#0E7A4E; background:#fff; }
-        .topbar-search svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:#adb5bd; }
 
         .topbar-actions { display:flex; align-items:center; gap:16px; }
         .icon-btn {
@@ -483,7 +470,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             .stats-grid { grid-template-columns:1fr; }
             .bar-chart { gap:8px; height:160px; }
             .bar-fill { max-width:30px; }
-            .topbar-search { max-width:none; }
             .chart-card { padding:18px; }
         }
     </style>
@@ -491,7 +477,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <body>
 <div class="dashboard-wrapper">
 
-    <!-- ===== SIDEBAR - EXACTLY AS INDEX.PHP (with Profile & Notifications, no badges) ===== -->
+    <!-- ===== SIDEBAR - WITH WISHLIST ===== -->
     <aside class="sidebar" id="adminSidebar">
         <div class="logo">
             <a href="../index.php">
@@ -535,6 +521,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                     </svg>
                     Messages
+                </a>
+            </li>
+            <!-- ===== WISHLIST LINK ===== -->
+            <li>
+                <a href="wishlist.php" class="<?php echo ($current_page == 'wishlist.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                    Wishlist
                 </a>
             </li>
         </ul>
@@ -600,11 +595,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
 
-            <div class="topbar-search">
-                <input type="text" placeholder="Search anything...">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </div>
-
             <div class="topbar-actions">
                 <!-- Notification bell (no count) -->
                 <button class="icon-btn" title="Notifications" onclick="window.location.href='notifications.php'">
@@ -628,8 +618,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
         </header>
 
         <div class="content-inner">
-
-                       
 
             <!-- Stats -->
             <div class="stats-grid">

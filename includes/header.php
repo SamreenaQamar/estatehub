@@ -14,7 +14,7 @@
 <body>
 
 <?php
-// Unread message count for the header notification badge
+// Unread message count (no longer used, but kept for compatibility)
 $header_unread_count = 0;
 $header_profile_pic = '';
 if (isset($_SESSION['user_id']) && isset($conn)) {
@@ -29,17 +29,24 @@ if (isset($_SESSION['user_id']) && isset($conn)) {
     }
 }
 
-// Determine dashboard link (but no role label shown)
+// Determine dashboard link and user role
 $dashboard_link = 'dashboard.php';
+$user_role_display = '';
 if (isset($_SESSION['user_type'])) {
     if ($_SESSION['user_type'] == 'seller') {
         $dashboard_link = 'seller-dashboard.php';
+        $user_role_display = 'Seller';
     } elseif ($_SESSION['user_type'] == 'user') {
         $dashboard_link = 'buyer-dashboard.php';
+        $user_role_display = 'Buyer';
     } elseif ($_SESSION['user_type'] == 'admin') {
         $dashboard_link = 'admin/index.php';
+        $user_role_display = 'Admin';
     }
 }
+
+// Check if we are on the home page to decide whether to show the role label
+$is_home_page = (basename($_SERVER['PHP_SELF']) == 'index.php');
 
 $header_pic_path = "uploads/profiles/" . $header_profile_pic;
 $has_header_pic = !empty($header_profile_pic) && file_exists($header_pic_path);
@@ -69,50 +76,37 @@ $has_header_pic = !empty($header_profile_pic) && file_exists($header_pic_path);
 
         <div class="header-actions">
             <?php if (isset($_SESSION['user_id'])): ?>
-                <a href="wishlist.php" class="wishlist">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                    </svg>
-                    Wishlist
-                </a>
-                <a href="messages.php" class="wishlist" style="position: relative;">
-                    <svg width="35" height="35" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M6 4C4.34 4 3 5.34 3 7V15C3 16.66 4.34 18 6 18H8L6.5 22L12 18H18C19.66 18 21 16.66 21 15V7C21 5.34 19.66 4 18 4H6Z"/>
-                        <circle cx="8" cy="11" r="1.3" fill="white"/>
-                        <circle cx="12" cy="11" r="1.3" fill="white"/>
-                        <circle cx="16" cy="11" r="1.3" fill="white"/>
-                    </svg>
-                    <?php if ($header_unread_count > 0): ?>
-                        <span style="position:absolute;top:-6px;right:-10px;background:#EF4444;color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1;"><?php echo $header_unread_count > 9 ? '9+' : $header_unread_count; ?></span>
-                    <?php endif; ?>
-                </a>
-                <div class="profile-dropdown">
-                    <button type="button" class="profile-trigger-btn" onclick="document.getElementById('headerProfileMenu').classList.toggle('open')">
-                        <span class="profile-avatar-btn">
-                            <?php if ($has_header_pic): ?>
-                                <img src="<?php echo htmlspecialchars($header_pic_path); ?>" alt="Profile">
-                            <?php else: ?>
-                                <span><?php echo strtoupper(substr($_SESSION['user_name'] ?? 'U', 0, 1)); ?></span>
-                            <?php endif; ?>
-                        </span>
-                        <span class="profile-name-text"><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></span>
-                    </button>
+                <!-- Wishlist and Messages links REMOVED -->
+             <!-- inside header-actions -->
+<div class="profile-dropdown">
+    <button type="button" class="profile-trigger-btn" onclick="document.getElementById('headerProfileMenu').classList.toggle('open')">
+        <span class="profile-avatar-btn">
+            <?php if ($has_header_pic): ?>
+                <img src="<?php echo htmlspecialchars($header_pic_path); ?>" alt="Profile">
+            <?php else: ?>
+                <span><?php echo strtoupper(substr($_SESSION['user_name'] ?? 'U', 0, 1)); ?></span>
+            <?php endif; ?>
+        </span>
+        <span class="profile-info">
+            <span class="profile-name-text"><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></span>
+            <?php if ($is_home_page && !empty($user_role_display)): ?>
+                <span class="profile-role-label"><?php echo htmlspecialchars($user_role_display); ?></span>
+            <?php endif; ?>
+        </span>
+    </button>
+    <!-- dropdown menu stays same -->
+</div>
                     <div class="profile-dropdown-menu" id="headerProfileMenu">
                         <div class="profile-dropdown-header">
                             <strong><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></strong>
-                            <!-- NO ROLE BADGE — removed to match original theme -->
+                            <!-- No role badge displayed here -->
                         </div>
                         <a href="<?php echo $dashboard_link; ?>"><i class="fas fa-gauge"></i> Dashboard</a>
                         <a href="logout.php"><i class="fas fa-right-from-bracket"></i> Logout</a>
                     </div>
                 </div>
             <?php else: ?>
-                <a href="wishlist.php" class="wishlist">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                    </svg>
-                    Wishlist
-                </a>
+                <!-- For guests: no wishlist link either -->
                 <a href="login.php" class="btn-outline">Login</a>
                 <a href="signup.php" class="btn-solid">Sign Up</a>
             <?php endif; ?>

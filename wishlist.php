@@ -192,7 +192,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .topbar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             gap: 20px;
             padding: 14px 32px;
             background: #fff;
@@ -201,11 +201,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             top:0;
             z-index:50;
         }
-        .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; }
-        .topbar-search { flex:1; max-width:500px; position:relative; }
-        .topbar-search input { width:100%; padding:9px 40px 9px 16px; border-radius:10px; border:1px solid #e9ecef; background:#f8fafc; font-size:14px; outline:none; transition:0.2s; }
-        .topbar-search input:focus { border-color:#0E7A4E; background:#fff; box-shadow:0 0 0 3px rgba(14,122,78,0.1); }
-        .topbar-search svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:#adb5bd; }
+        .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; margin-right:auto; }
 
         .topbar-actions { display:flex; align-items:center; gap:10px; }
         .user-chip { display:flex; align-items:center; gap:10px; text-decoration:none; }
@@ -469,7 +465,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
         @media (max-width:768px) {
             .content-inner { padding:18px; }
             .topbar { padding:12px 18px; flex-wrap:wrap; }
-            .topbar-search { max-width:100%; order:3; flex-basis:100%; margin-top:8px; }
             .user-info { display:none; }
             .wishlist-header { flex-direction:column; align-items:flex-start; gap:12px; }
         }
@@ -537,11 +532,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <button class="topbar-menu-btn" onclick="document.getElementById('sellerSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
-
-            <div class="topbar-search">
-                <input type="text" placeholder="Search anything...">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </div>
 
             <div class="topbar-actions">
                 <a href="profile-settings.php" class="user-chip">

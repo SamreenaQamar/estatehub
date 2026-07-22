@@ -12,8 +12,8 @@ $settings_message = '';
 if (isset($_POST['save_settings'])) {
     $site_name = mysqli_real_escape_string($conn, $_POST['site_name'] ?? 'EstateHub');
     $admin_email = mysqli_real_escape_string($conn, $_POST['admin_email'] ?? '');
-    $currency = mysqli_real_escape_string($conn, $_POST['currency'] ?? 'USD ($)');
-    $timezone = mysqli_real_escape_string($conn, $_POST['timezone'] ?? 'UTC-5 (Eastern)');
+    $currency = mysqli_real_escape_string($conn, $_POST['currency'] ?? 'PKR (₨)');
+    $timezone = mysqli_real_escape_string($conn, $_POST['timezone'] ?? 'UTC+5 (Pakistan)');
     $phone = mysqli_real_escape_string($conn, $_POST['phone'] ?? '');
     $address = mysqli_real_escape_string($conn, $_POST['address'] ?? '');
     $footer_text = mysqli_real_escape_string($conn, $_POST['footer_text'] ?? '');
@@ -31,11 +31,13 @@ if (isset($_POST['save_settings'])) {
     $result = mysqli_query($conn, "SHOW TABLES LIKE 'settings'");
 
     if (mysqli_num_rows($result) > 0) {
+        // Clear existing settings first
+        mysqli_query($conn, "DELETE FROM settings");
+        
         foreach ($settings_data as $key => $value) {
             mysqli_query($conn,
                 "INSERT INTO settings (setting_key, setting_value) 
-                 VALUES ('$key', '$value') 
-                 ON DUPLICATE KEY UPDATE setting_value = '$value'"
+                 VALUES ('$key', '$value')"
             );
         }
         $settings_message = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Settings saved successfully!</div>';
@@ -47,8 +49,8 @@ if (isset($_POST['save_settings'])) {
 
 $site_name = 'EstateHub';
 $admin_email = 'admin@estatehub.com';
-$currency = 'USD ($)';
-$timezone = 'UTC-5 (Eastern)';
+$currency = 'PKR (₨)';
+$timezone = 'UTC+5 (Pakistan)';
 $phone = '';
 $address = '';
 $footer_text = '';
@@ -258,7 +260,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .topbar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             gap: 20px;
             padding: 14px 32px;
             background: #fff;
@@ -268,19 +270,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             z-index:50;
         }
         .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; }
-        .topbar-search { flex:1; max-width:500px; position:relative; }
-        .topbar-search input {
-            width:100%;
-            padding:9px 40px 9px 16px;
-            border-radius:10px;
-            border:1px solid #e9ecef;
-            background:#f8fafc;
-            font-size:14px;
-            outline:none;
-            transition:0.2s;
-        }
-        .topbar-search input:focus { border-color:#0E7A4E; background:#fff; }
-        .topbar-search svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:#adb5bd; }
 
         .topbar-actions { display:flex; align-items:center; gap:16px; }
         .icon-btn {
@@ -450,14 +439,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
             .topbar { padding:12px 16px; flex-wrap:wrap; }
             .form-row { grid-template-columns:1fr; }
             .settings-card { padding:20px; }
-            .topbar-search { max-width:none; }
         }
     </style>
 </head>
 <body>
 <div class="dashboard-wrapper">
 
-    <!-- ===== SIDEBAR - EXACTLY AS INDEX.PHP (with Profile & Notifications, no badges) ===== -->
+    <!-- ===== SIDEBAR - WITH WISHLIST ===== -->
     <aside class="sidebar" id="adminSidebar">
         <div class="logo">
             <a href="../index.php">
@@ -501,6 +489,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                     </svg>
                     Messages
+                </a>
+            </li>
+            <!-- ===== WISHLIST LINK ===== -->
+            <li>
+                <a href="wishlist.php" class="<?php echo ($current_page == 'wishlist.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                    Wishlist
                 </a>
             </li>
         </ul>
@@ -566,11 +563,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
 
-            <div class="topbar-search">
-                <input type="text" placeholder="Search anything...">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </div>
-
             <div class="topbar-actions">
                 <!-- Notification bell (no count) -->
                 <button class="icon-btn" title="Notifications" onclick="window.location.href='notifications.php'">
@@ -626,19 +618,19 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <div class="form-group">
                             <label>Currency</label>
                             <select name="currency">
+                                <option value="PKR (₨)" <?php echo $currency == 'PKR (₨)' ? 'selected' : ''; ?>>PKR (₨)</option>
                                 <option value="USD ($)" <?php echo $currency == 'USD ($)' ? 'selected' : ''; ?>>USD ($)</option>
                                 <option value="EUR (€)" <?php echo $currency == 'EUR (€)' ? 'selected' : ''; ?>>EUR (€)</option>
                                 <option value="GBP (£)" <?php echo $currency == 'GBP (£)' ? 'selected' : ''; ?>>GBP (£)</option>
-                                <option value="PKR (₨)" <?php echo $currency == 'PKR (₨)' ? 'selected' : ''; ?>>PKR (₨)</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label>Timezone</label>
                             <select name="timezone">
+                                <option value="UTC+5 (Pakistan)" <?php echo $timezone == 'UTC+5 (Pakistan)' ? 'selected' : ''; ?>>UTC+5 (Pakistan)</option>
                                 <option value="UTC-5 (Eastern)" <?php echo $timezone == 'UTC-5 (Eastern)' ? 'selected' : ''; ?>>UTC-5 (Eastern)</option>
                                 <option value="UTC-8 (Pacific)" <?php echo $timezone == 'UTC-8 (Pacific)' ? 'selected' : ''; ?>>UTC-8 (Pacific)</option>
                                 <option value="UTC+0 (London)" <?php echo $timezone == 'UTC+0 (London)' ? 'selected' : ''; ?>>UTC+0 (London)</option>
-                                <option value="UTC+5 (Pakistan)" <?php echo $timezone == 'UTC+5 (Pakistan)' ? 'selected' : ''; ?>>UTC+5 (Pakistan)</option>
                             </select>
                         </div>
                     </div>
@@ -674,6 +666,7 @@ document.addEventListener('DOMContentLoaded', function() {
     alerts.forEach(function(alert) {
         setTimeout(function() {
             alert.style.opacity = '0';
+            alert.style.transition = 'opacity 0.5s, transform 0.5s';
             alert.style.transform = 'translateY(-10px)';
             setTimeout(function() {
                 if (alert.parentNode) {

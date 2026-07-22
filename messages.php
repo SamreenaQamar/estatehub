@@ -99,6 +99,15 @@ if ($selected_sender_id && $selected_property_id) {
 
 $page_title = 'Messages';
 $current_page = basename($_SERVER['PHP_SELF']);
+
+// Seller avatar
+$seller_avatar = '';
+$pic_query = mysqli_query($conn, "SELECT profile_pic FROM users WHERE id = $seller_id");
+if ($pic_query && $row = mysqli_fetch_assoc($pic_query)) {
+    if (!empty($row['profile_pic']) && file_exists("uploads/profiles/".$row['profile_pic'])) {
+        $seller_avatar = "uploads/profiles/".$row['profile_pic'];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -243,7 +252,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .topbar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             gap: 20px;
             padding: 14px 32px;
             background: #fff;
@@ -252,20 +261,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             top:0;
             z-index:50;
         }
-        .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; }
-        .topbar-search { flex:1; max-width:500px; position:relative; }
-        .topbar-search input {
-            width:100%;
-            padding:9px 40px 9px 16px;
-            border-radius:10px;
-            border:1px solid #e9ecef;
-            background:#f8fafc;
-            font-size:14px;
-            outline:none;
-            transition:0.2s;
-        }
-        .topbar-search input:focus { border-color:#0E7A4E; background:#fff; }
-        .topbar-search svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:#adb5bd; }
+        .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; margin-right:auto; }
 
         .topbar-actions { display:flex; align-items:center; gap:16px; }
         .icon-btn {
@@ -785,27 +781,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <button class="topbar-menu-btn" onclick="document.getElementById('sellerSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
-            <div class="topbar-search">
-                <input type="text" placeholder="Search anything...">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </div>
+
             <div class="topbar-actions">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                    <?php if($unread_count > 0): ?>
-                        <span class="count"><?php echo $unread_count > 9 ? '9+' : $unread_count; ?></span>
-                    <?php endif; ?>
-                </button>
                 <a href="profile-settings.php" class="user-chip">
                     <div class="user-avatar">
-                        <?php
-                        $seller_avatar = '';
-                        $pic_query = mysqli_query($conn, "SELECT profile_pic FROM users WHERE id = $seller_id");
-                        if ($pic_query && $row = mysqli_fetch_assoc($pic_query)) {
-                            if (!empty($row['profile_pic']) && file_exists("uploads/profiles/".$row['profile_pic'])) {
-                                $seller_avatar = "uploads/profiles/".$row['profile_pic'];
-                            }
-                        }
-                        if(!empty($seller_avatar)): ?>
+                        <?php if(!empty($seller_avatar)): ?>
                             <img src="<?php echo $seller_avatar; ?>" alt="<?php echo htmlspecialchars($seller_name); ?>">
                         <?php else: ?>
                             <?php echo strtoupper(substr($seller_name, 0, 1)); ?>
@@ -1092,14 +1072,12 @@ function performDeleteConversation(senderId, propertyId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Remove from list
             const items = document.querySelectorAll('.conversation-item');
             items.forEach(item => {
                 if (item.dataset.sender == senderId && item.dataset.property == propertyId) {
                     item.remove();
                 }
             });
-            // If no items left, show empty state
             const list = document.getElementById('convList');
             if (list.querySelectorAll('.conversation-item').length === 0) {
                 list.innerHTML = `
@@ -1109,7 +1087,6 @@ function performDeleteConversation(senderId, propertyId) {
                     </div>
                 `;
             }
-            // Redirect to clear selected conversation
             window.location.href = 'messages.php';
         } else {
             alert(data.error || 'Failed to delete conversation.');

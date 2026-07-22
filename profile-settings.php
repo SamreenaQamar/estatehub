@@ -417,11 +417,11 @@ $user_name = $_SESSION['user_name'] ?? 'Seller';
             box-shadow:0 8px 20px rgba(220,38,38,.35) !important;
         }
 
-        /* ===== TOP BAR (seller version, unchanged) ===== */
+        /* ===== TOP BAR ===== */
         .topbar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             gap: 20px;
             padding: 14px 32px;
             background: #fff;
@@ -430,46 +430,9 @@ $user_name = $_SESSION['user_name'] ?? 'Seller';
             top:0;
             z-index:50;
         }
-        .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; }
-        .topbar-search { flex:1; max-width:500px; position:relative; }
-        .topbar-search input {
-            width:100%;
-            padding:9px 40px 9px 16px;
-            border-radius:10px;
-            border:1px solid #e9ecef;
-            background:#f8fafc;
-            font-size:14px;
-            outline:none;
-            transition:0.2s;
-        }
-        .topbar-search input:focus { border-color:#0E7A4E; background:#fff; }
-        .topbar-search svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:#adb5bd; }
+        .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; margin-right:auto; }
 
         .topbar-actions { display:flex; align-items:center; gap:16px; }
-        .icon-btn {
-            position: relative;
-            width: 38px;
-            height: 38px;
-            border-radius: 10px;
-            background: #f8fafc;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition:0.2s;
-            color:#1e293b;
-        }
-        .icon-btn:hover { background:#e9ecef; }
-        .icon-btn svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2; }
-        .icon-btn .count {
-            position:absolute; top:-4px; right:-4px;
-            background:#ef4444; color:#fff;
-            font-size:10px; font-weight:700;
-            min-width:18px; height:18px; border-radius:50%;
-            display:flex; align-items:center; justify-content:center;
-            border:2px solid #fff;
-        }
         .user-chip { display:flex; align-items:center; gap:10px; text-decoration:none; }
         .user-avatar {
             width:36px; height:36px; border-radius:10px;
@@ -706,7 +669,6 @@ $user_name = $_SESSION['user_name'] ?? 'Seller';
             .profile-side-avatar { width:100px; height:100px; }
             .profile-side-banner { height:80px; }
             .profile-side-avatar-wrap { margin-top:-50px; }
-            .topbar-search { max-width:none; }
         }
         @media (max-width:500px) {
             .profile-side-avatar { width:80px; height:80px; }
@@ -790,23 +752,13 @@ $user_name = $_SESSION['user_name'] ?? 'Seller';
     <!-- ===== MAIN CONTENT ===== -->
     <div class="main-content">
 
-        <!-- TOP BAR (seller version, unchanged) -->
+        <!-- TOP BAR -->
         <header class="topbar">
             <button class="topbar-menu-btn" onclick="document.getElementById('sellerSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
 
-            <div class="topbar-search">
-                <input type="text" placeholder="Search anything...">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </div>
-
             <div class="topbar-actions">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                    <?php if($total_messages > 0): ?>
-                        <span class="count"><?php echo $total_messages > 9 ? '9+' : $total_messages; ?></span>
-                    <?php endif; ?>
-                </button>
                 <a href="profile-settings.php" class="user-chip">
                     <div class="user-avatar">
                         <?php if(!empty($profile_pic_path)): ?>
