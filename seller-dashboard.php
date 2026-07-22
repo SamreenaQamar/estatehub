@@ -1,6 +1,7 @@
 <?php
 $page_title = 'Seller Dashboard';
-require_once __DIR__ . '/includes/config.php';
+require_once __DIR__ . '/../includes/config.php';
+
 if(!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
@@ -81,25 +82,11 @@ $properties_growth = $props_before > 0 ? round((($total_properties - $props_befo
 $active_before = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM properties WHERE user_id=$user_id AND status='Active' AND created_at < '$start_this_month'"))['c'] ?? 0;
 $active_growth = $active_before > 0 ? round((($active_properties - $active_before) / $active_before) * 100) : ($active_properties > 0 ? 100 : 0);
 
-// Recent properties (4) with images
+// Recent properties (fetch up to 6 for a nice grid)
 $recent_props = [];
-$prop_result = mysqli_query($conn, "SELECT * FROM properties WHERE user_id=$user_id ORDER BY created_at DESC LIMIT 4");
+$prop_result = mysqli_query($conn, "SELECT * FROM properties WHERE user_id=$user_id ORDER BY created_at DESC LIMIT 6");
 if($prop_result) {
     while($row = mysqli_fetch_assoc($prop_result)) {
-        $first_img = '';
-        if(!empty($row['image_main']) && file_exists($row['image_main'])) {
-            $first_img = $row['image_main'];
-        } elseif(!empty($row['images'])) {
-            $imgs = explode(',', $row['images']);
-            $first_img = trim($imgs[0]);
-        }
-        if(empty($first_img) || !file_exists($first_img)) {
-            $types = ['house', 'apartment', 'villa', 'plot', 'commercial'];
-            $t = strtolower($row['property_type'] ?? 'house');
-            $t = in_array($t, $types) ? $t : 'house';
-            $first_img = "https://source.unsplash.com/800x600/?" . $t . ",building&sig=" . $row['id'];
-        }
-        $row['thumbnail'] = $first_img;
         $recent_props[] = $row;
     }
 }
@@ -129,6 +116,45 @@ elseif($hour < 17) $greeting = 'Good Afternoon';
 else $greeting = 'Good Evening';
 
 $current_page = basename($_SERVER['PHP_SELF']);
+
+// ============================================================
+// getPropertyImages() - same as home page
+// ============================================================
+if (!function_exists('getPropertyImages')) {
+    function getPropertyImages($type, $id) {
+        switch (strtolower(trim($type))) {
+            case 'house':        $folder = 'house'; break;
+            case 'apartment':    $folder = 'apartment'; break;
+            case 'plot':         $folder = 'plot'; break;
+            case 'commercial':   $folder = 'commercial'; break;
+            case 'farm house':   $folder = 'farmhouse'; break;
+            case 'villa':        $folder = 'villa'; break;
+            case 'penthouse':    $folder = 'penthouse'; break;
+            case 'portion':      $folder = 'portion'; break;
+            default:             $folder = 'house'; break;
+        }
+        $images = [];
+        $start = ($id % 10) + 1;
+        for ($i = 0; $i < 4; $i++) {
+            $num = (($start + $i - 1) % 10) + 1;
+            $images[] = "assets/images/$folder/$num.jpg";
+        }
+        return $images;
+    }
+}
+
+// Helper to format price
+function formatCardPrice($price, $purpose) {
+    if ($price > 0) {
+        $formatted = number_format($price / 1000000, 1);
+        $html = 'PKR ' . $formatted . 'M';
+        if ($purpose == 'Rent') {
+            $html .= ' <span class="per-month">/ Month</span>';
+        }
+        return $html;
+    }
+    return '<span class="contact-price">Contact for Price</span>';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -210,7 +236,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .main-content { flex:1; overflow-y:auto; }
         .content-inner { padding:28px 32px 40px; }
 
-        /* ===== WELCOME BANNER (more professional) ===== */
+        /* ===== WELCOME BANNER ===== */
         .welcome-banner {
             position:relative;
             overflow:hidden;
@@ -319,151 +345,306 @@ $current_page = basename($_SERVER['PHP_SELF']);
         .stat-growth.down { color:#ef4444; background:#fee2e2; }
         .stat-growth.neutral { color:#94a3b8; background:#f1f5f9; }
 
-        /* ===== CONTENT GRID ===== */
-        .content-grid { display:grid; grid-template-columns:1.5fr 1fr; gap:20px; }
-        .content-card {
-            background:#fff;
-            border-radius:18px;
-            padding:20px 22px;
-            border:1px solid #edf2f7;
-            box-shadow:0 4px 12px rgba(15,23,42,0.02);
-            transition:box-shadow .3s;
+        /* ===== PROPERTY GRID - PREMIUM CARDS (same as buyer/home) ===== */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
         }
-        .content-card:hover { box-shadow:0 12px 30px rgba(15,23,42,0.06); }
-        .card-header {
-            display:flex;
-            justify-content:space-between;
-            align-items:center;
-            margin-bottom:16px;
-            padding-bottom:12px;
-            border-bottom:1px solid #edf2f7;
+        .section-header h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #111827;
+            font-family: 'Fraunces', serif;
         }
-        .card-header h3 { font-size:18px; font-weight:700; color:#0b1a2e; }
-        .card-header a {
-            color:#0E7A4E;
-            text-decoration:none;
-            font-size:13px;
-            font-weight:700;
-            transition:color .2s;
+        .section-header a {
+            color: #0E7A4E;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
-        .card-header a:hover { color:#0a5c3a; text-decoration:underline; }
-
-        /* ===== PROPERTY ITEMS ===== */
-        .property-item {
-            display:flex;
-            gap:14px;
-            padding:10px 12px;
-            border-radius:12px;
-            transition:.2s;
-            margin-bottom:8px;
-            align-items:center;
-            background:#fafcfc;
-        }
-        .property-item:hover { background:#f0f6f2; }
-        .property-item .thumb {
-            width:64px;
-            height:64px;
-            border-radius:12px;
-            overflow:hidden;
-            flex-shrink:0;
-            background:#e5e7eb;
-            box-shadow:0 2px 6px rgba(0,0,0,0.04);
-        }
-        .property-item .thumb img {
-            width:100%;
-            height:100%;
-            object-fit:cover;
-            transition:transform .3s;
-        }
-        .property-item:hover .thumb img { transform:scale(1.03); }
-        .property-item .info { flex:1; min-width:0; }
-        .property-item .info h4 {
-            font-size:15px;
-            font-weight:700;
-            color:#0b1a2e;
-            margin-bottom:4px;
-            white-space:nowrap;
-            overflow:hidden;
-            text-overflow:ellipsis;
-        }
-        .property-item .meta {
-            font-size:12px;
-            color:#64748b;
-            display:flex;
-            align-items:center;
-            gap:6px;
-            flex-wrap:wrap;
-        }
-        .status-badge {
-            padding:2px 12px;
-            border-radius:30px;
-            font-size:10px;
-            font-weight:700;
-            text-transform:capitalize;
-        }
-        .status-active { background:#dcfce7; color:#15803d; }
-        .status-pending { background:#fef3c7; color:#b45309; }
-        .status-sold { background:#e5e7eb; color:#374151; }
-        .property-item .price {
-            color:#0E7A4E;
-            font-weight:800;
-            font-size:15px;
-            white-space:nowrap;
-            background:#e6f7ed;
-            padding:2px 12px;
-            border-radius:20px;
+        .section-header a:hover {
+            text-decoration: underline;
         }
 
-        /* ===== MESSAGE ITEMS ===== */
-        .message-item {
-            display:flex;
-            align-items:flex-start;
-            gap:14px;
-            padding:12px 0;
-            border-bottom:1px solid #f1f5f9;
+        .properties-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 40px;
         }
-        .message-item:last-child { border-bottom:none; }
+
+        .premium-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            background: #fff;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        .premium-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.12);
+        }
+        .premium-card .card-image-slider {
+            border-radius: 16px 16px 0 0;
+            overflow: hidden;
+            position: relative;
+            height: 200px;
+            background: #f3f4f6;
+        }
+        .card-image-slider .slider-container { width: 100%; height: 100%; overflow: hidden; }
+        .card-image-slider .slider-track { display: flex; height: 100%; transition: transform 0.5s ease; }
+        .card-image-slider .slider-track img { width: 100%; height: 100%; object-fit: cover; flex-shrink: 0; }
+        .slider-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.7);
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 18px;
+            cursor: pointer;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 3;
+        }
+        .premium-card:hover .slider-btn { opacity: 1; pointer-events: auto; }
+        .slider-btn:hover { background: white; }
+        .slider-prev { left: 8px; }
+        .slider-next { right: 8px; }
+        .slider-dots {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 5px;
+            z-index: 3;
+        }
+        .slider-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.5); cursor: pointer; transition: 0.2s; }
+        .slider-dot.active { background: white; width: 16px; border-radius: 4px; }
+
+        .card-tag {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            padding: 4px 14px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            color: white;
+            z-index: 4;
+        }
+        .card-tag.for-sale { background: #0E7A4E; }
+        .card-tag.for-rent { background: #10B981; }
+
+        .featured-badge {
+            position: absolute;
+            top: 12px;
+            left: 90px;
+            background: #F59E0B;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 700;
+            z-index: 4;
+        }
+
+        .wishlist-icon {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 4;
+        }
+        .wishlist-icon:hover { background: rgba(0,0,0,0.6); }
+        .wishlist-icon svg { width: 18px; height: 18px; fill: none; stroke: #ffffff; transition: all 0.3s ease; }
+        .wishlist-icon.active { background: #ef4444; }
+        .wishlist-icon.active svg { fill: #ffffff; stroke: #ffffff; }
+
+        .premium-card .card-body {
+            padding: 16px 18px 18px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .premium-card .card-body h3 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #0b1a2e;
+            margin-bottom: 4px;
+            line-height: 1.3;
+        }
+        .card-location {
+            font-size: 12px;
+            color: #6B7280;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .card-location svg {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            flex-shrink: 0;
+        }
+        .card-price {
+            font-size: 24px;
+            font-weight: 800;
+            color: #0E7A4E;
+            margin: 8px 0 12px;
+        }
+        .card-price .per-month {
+            font-size: 14px;
+            font-weight: 600;
+            color: #64748b;
+        }
+        .contact-price {
+            font-size: 16px;
+            font-weight: 700;
+            color: #ef4444;
+        }
+        .card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 14px;
+            margin-bottom: 14px;
+            border-top: 1px solid #eef2f7;
+            padding-top: 12px;
+        }
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #1e293b;
+        }
+        .meta-item i {
+            font-size: 14px;
+            color: #1e293b;
+            width: 16px;
+            text-align: center;
+        }
+
+        .view-detail-btn {
+            display: block;
+            width: 100%;
+            text-align: center;
+            padding: 12px 0;
+            background: linear-gradient(135deg, #0E7A4E, #16a34a);
+            color: #fff;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 15px;
+            text-decoration: none;
+            transition: 0.3s;
+            border: none;
+            margin-top: auto;
+        }
+        .view-detail-btn:hover {
+            background: #0a5c3a;
+            transform: scale(1.01);
+            box-shadow: 0 8px 25px rgba(14,122,78,0.3);
+            color: #fff;
+        }
+
+        /* ===== MESSAGES SECTION ===== */
+        .messages-section {
+            margin-top: 20px;
+        }
+        .messages-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+        .message-card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 16px 20px;
+            border: 1px solid #edf2f7;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            transition: 0.3s;
+        }
+        .message-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+        }
         .msg-avatar {
-            width:40px;
-            height:40px;
-            border-radius:50%;
-            background:linear-gradient(135deg,#0E7A4E,#16a34a);
-            color:#fff;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            font-weight:700;
-            font-size:14px;
-            flex-shrink:0;
-            box-shadow:0 2px 8px rgba(14,122,78,0.15);
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0E7A4E, #16a34a);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            flex-shrink: 0;
         }
-        .msg-body { flex:1; min-width:0; }
-        .msg-name { font-size:14px; font-weight:700; color:#0b1a2e; margin-bottom:2px; }
-        .msg-preview {
-            font-size:13px;
-            color:#64748b;
-            overflow:hidden;
-            text-overflow:ellipsis;
-            white-space:nowrap;
-            max-width:100%;
+        .msg-content {
+            flex: 1;
+            min-width: 0;
         }
-        .msg-time { font-size:11px; color:#94a3b8; white-space:nowrap; margin-top:2px; }
+        .msg-content .sender {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0b1a2e;
+        }
+        .msg-content .preview {
+            font-size: 13px;
+            color: #64748b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .msg-time {
+            font-size: 12px;
+            color: #94a3b8;
+            white-space: nowrap;
+        }
 
-        /* ===== EMPTY STATE ===== */
         .empty-state {
-            text-align:center;
-            padding:35px 20px;
-            color:#94a3b8;
+            text-align: center;
+            padding: 40px 20px;
+            color: #94a3b8;
         }
         .empty-state svg {
-            width:56px;
-            height:56px;
-            color:#d1d9e6;
-            margin-bottom:12px;
-            opacity:0.7;
+            width: 56px;
+            height: 56px;
+            color: #d1d9e6;
+            margin-bottom: 12px;
+            opacity: 0.7;
         }
-        .empty-state p { color:#64748b; font-size:14px; margin-bottom:8px; }
-        .empty-state a { color:#0E7A4E; text-decoration:none; font-weight:700; }
+        .empty-state p { color: #64748b; font-size: 14px; margin-bottom: 8px; }
+        .empty-state a { color: #0E7A4E; text-decoration:none; font-weight:700; }
         .empty-state a:hover { text-decoration:underline; }
 
         /* ===== RESPONSIVE ===== */
@@ -472,7 +653,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             .sidebar { position:fixed; left:-280px; transition:left 0.3s; }
             .sidebar.open { left:0; }
             .topbar-menu-btn { display:flex; }
-            .content-grid { grid-template-columns:1fr; }
+            .properties-grid { grid-template-columns:repeat(2,1fr); }
         }
         @media (max-width:768px) {
             .content-inner { padding:18px; }
@@ -482,8 +663,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
             .welcome-banner { flex-direction:column; align-items:flex-start; padding:25px 20px; }
             .welcome-banner h1 { font-size:22px; }
             .user-info { display:none; }
-            .property-item { flex-wrap:wrap; }
-            .property-item .price { margin-left:auto; }
+            .properties-grid { grid-template-columns:1fr; }
+            .messages-grid { grid-template-columns:1fr; }
         }
         @media (max-width:480px) { .stats-grid { grid-template-columns:1fr; } }
     </style>
@@ -531,7 +712,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 Profile Settings
             </a></li>
             <li><a href="settings.php">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 Settings
             </a></li>
             <li><a href="logout.php" class="logout-link">
@@ -574,7 +755,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
         <div class="content-inner">
 
-            <!-- Welcome Banner (professional) -->
+            <!-- Welcome Banner -->
             <div class="welcome-banner">
                 <div>
                     <h1>👋 <?php echo $greeting; ?>, <?php echo htmlspecialchars($user_name); ?>!</h1>
@@ -596,7 +777,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </a>
             </div>
 
-            <!-- Stats Grid -->
+            <!-- Stats -->
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-icon green">
@@ -641,70 +822,239 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </div>
             </div>
 
-            <!-- Recent Properties + Messages -->
-            <div class="content-grid">
+            <!-- ===== RECENT PROPERTIES (Premium Cards) ===== -->
+            <div class="section-header">
+                <h2>Recent Properties</h2>
+                <a href="my-properties.php">View All →</a>
+            </div>
 
-                <div class="content-card">
-                    <div class="card-header">
-                        <h3>Recent Properties</h3>
-                        <a href="my-properties.php">View All →</a>
-                    </div>
-                    <?php if(empty($recent_props)): ?>
-                        <div class="empty-state">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                            <p>No properties listed yet</p>
-                            <a href="add-property.php">Add your first property →</a>
-                        </div>
-                    <?php else: foreach($recent_props as $p):
-                        $status = strtolower($p['status'] ?? 'active');
-                        $loc = $p['location'] ?? ($p['city'] ?? '');
-                    ?>
-                        <div class="property-item">
-                            <div class="thumb">
-                                <img src="<?php echo htmlspecialchars($p['thumbnail']); ?>" alt="<?php echo htmlspecialchars($p['title']); ?>" loading="lazy">
-                            </div>
-                            <div class="info">
-                                <h4><?php echo htmlspecialchars($p['title']); ?></h4>
-                                <div class="meta">
-                                    <span><?php echo htmlspecialchars($loc); ?></span>
-                                    <span>•</span>
-                                    <span><?php echo $p['bedrooms'] ?? 0; ?> Beds</span>
-                                    <span>•</span>
-                                    <span><?php echo $p['bathrooms'] ?? 0; ?> Baths</span>
-                                    <span class="status-badge status-<?php echo $status; ?>"><?php echo htmlspecialchars($p['status']); ?></span>
-                                </div>
-                            </div>
-                            <div class="price">PKR <?php echo number_format($p['price']); ?></div>
-                        </div>
-                    <?php endforeach; endif; ?>
+            <?php if(empty($recent_props)): ?>
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    <p>No properties listed yet</p>
+                    <a href="add-property.php">Add your first property →</a>
                 </div>
+            <?php else: ?>
+                <div class="properties-grid">
+                    <?php foreach($recent_props as $prop):
+                        $images = getPropertyImages($prop['property_type'] ?? 'house', $prop['id']);
+                        $price_display = formatCardPrice($prop['price'], $prop['purpose'] ?? 'Sale');
+                        $price_suffix = ($prop['purpose'] == 'Rent' && $prop['price'] > 0) ? ' <span class="per-month">/ Month</span>' : '';
+                        $tag_class = ($prop['purpose'] == 'Rent') ? 'for-rent' : 'for-sale';
+                        $tag_label = ($prop['purpose'] == 'Rent') ? 'For Rent' : 'For Sale';
+                    ?>
+                        <div class="premium-card" data-property-id="<?php echo $prop['id']; ?>">
+                            <div class="card-image-slider" id="slider_<?php echo $prop['id']; ?>">
+                                <div class="slider-container">
+                                    <div class="slider-track">
+                                        <?php foreach ($images as $img): ?>
+                                            <img src="<?php echo htmlspecialchars($img); ?>"
+                                                 alt="<?php echo htmlspecialchars($prop['title']); ?>"
+                                                 loading="lazy"
+                                                 onerror="this.src='assets/images/house/1.jpg';">
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                                <button class="slider-btn slider-prev" onclick="prevSlide('slider_<?php echo $prop['id']; ?>')">‹</button>
+                                <button class="slider-btn slider-next" onclick="nextSlide('slider_<?php echo $prop['id']; ?>')">›</button>
+                                <div class="slider-dots" id="dots_<?php echo $prop['id']; ?>"></div>
+                            </div>
 
-                <div class="content-card">
-                    <div class="card-header">
-                        <h3>Recent Messages</h3>
-                        <a href="messages.php">View All →</a>
-                    </div>
-                    <?php if(empty($recent_msgs)): ?>
-                        <div class="empty-state">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                            <p>No messages yet</p>
+                            <div class="card-tag <?php echo $tag_class; ?>">
+                                <?php echo $tag_label; ?>
+                            </div>
+                            <?php if (!empty($prop['featured'])): ?>
+                                <div class="featured-badge">Featured</div>
+                            <?php endif; ?>
+
+                            <a href="javascript:void(0)" class="wishlist-icon" data-id="<?php echo (int) $prop['id']; ?>" onclick="toggleWishlistSeller(this)" title="Add to wishlist">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                                </svg>
+                            </a>
+
+                            <div class="card-body">
+                                <h3><?php echo htmlspecialchars($prop['title']); ?></h3>
+                                <div class="card-location">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                                        <circle cx="12" cy="10" r="3"/>
+                                    </svg>
+                                    <?php echo htmlspecialchars($prop['location']); ?>, <?php echo htmlspecialchars($prop['city']); ?>
+                                </div>
+                                <div class="card-price">
+                                    <?php echo $price_display; ?>
+                                    <?php echo $price_suffix; ?>
+                                </div>
+                                <div class="card-meta">
+                                    <?php if ($prop['bedrooms']): ?>
+                                        <span class="meta-item"><i class="fas fa-bed"></i> <?php echo $prop['bedrooms']; ?> Beds</span>
+                                    <?php endif; ?>
+                                    <?php if ($prop['bathrooms']): ?>
+                                        <span class="meta-item"><i class="fas fa-bath"></i> <?php echo $prop['bathrooms']; ?> Baths</span>
+                                    <?php endif; ?>
+                                    <?php if (!empty($prop['area_size'])): ?>
+                                        <span class="meta-item"><i class="fas fa-vector-square"></i> <?php echo htmlspecialchars($prop['area_size']); ?></span>
+                                    <?php endif; ?>
+                                    <span class="meta-item"><i class="fas fa-building"></i> <?php echo htmlspecialchars($prop['property_type']); ?></span>
+                                </div>
+                                <a href="property-detail.php?id=<?php echo $prop['id']; ?>" class="view-detail-btn">View Details</a>
+                            </div>
                         </div>
-                    <?php else: foreach($recent_msgs as $m): ?>
-                        <div class="message-item">
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+
+            <!-- ===== RECENT MESSAGES ===== -->
+            <div class="section-header" style="margin-top: 10px;">
+                <h2>Recent Messages</h2>
+                <a href="messages.php">View All →</a>
+            </div>
+
+            <?php if(empty($recent_msgs)): ?>
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <p>No messages yet</p>
+                </div>
+            <?php else: ?>
+                <div class="messages-grid">
+                    <?php foreach($recent_msgs as $m): ?>
+                        <div class="message-card">
                             <div class="msg-avatar"><?php echo strtoupper(substr($m['sender_name'], 0, 1)); ?></div>
-                            <div class="msg-body">
-                                <div class="msg-name"><?php echo htmlspecialchars($m['sender_name']); ?></div>
-                                <div class="msg-preview"><?php echo htmlspecialchars(substr($m['message'], 0, 60)); ?></div>
+                            <div class="msg-content">
+                                <div class="sender"><?php echo htmlspecialchars($m['sender_name']); ?></div>
+                                <div class="preview"><?php echo htmlspecialchars(substr($m['message'], 0, 60)); ?></div>
                             </div>
                             <div class="msg-time"><?php echo time_ago($m['created_at']); ?></div>
                         </div>
-                    <?php endforeach; endif; ?>
+                    <?php endforeach; ?>
                 </div>
-
-            </div>
+            <?php endif; ?>
 
         </div>
     </div>
 </div>
+
+<script>
+// ============================================ //
+// SLIDER FUNCTIONS
+// ============================================ //
+let slideIndexes = {};
+
+function initSlider(sliderId, imageCount) {
+    slideIndexes[sliderId] = 0;
+    updateDots(sliderId, imageCount);
+}
+
+function updateDots(sliderId, imageCount) {
+    const dotsContainer = document.getElementById(sliderId.replace('slider_', 'dots_'));
+    if (!dotsContainer) return;
+    dotsContainer.innerHTML = '';
+    for (let i = 0; i < imageCount; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'slider-dot' + (i === slideIndexes[sliderId] ? ' active' : '');
+        dot.onclick = () => goToSlide(sliderId, i);
+        dotsContainer.appendChild(dot);
+    }
+}
+
+function goToSlide(sliderId, index) {
+    const slider = document.getElementById(sliderId);
+    if (!slider) return;
+    const track = slider.querySelector('.slider-track');
+    if (!track) return;
+    const images = track.querySelectorAll('img');
+    if (index < 0) index = 0;
+    if (index >= images.length) index = images.length - 1;
+    slideIndexes[sliderId] = index;
+    track.style.transform = `translateX(-${index * 100}%)`;
+    updateDots(sliderId, images.length);
+}
+
+function prevSlide(sliderId) {
+    const slider = document.getElementById(sliderId);
+    if (!slider) return;
+    const track = slider.querySelector('.slider-track');
+    if (!track) return;
+    const images = track.querySelectorAll('img');
+    let currentIndex = slideIndexes[sliderId] || 0;
+    currentIndex--;
+    if (currentIndex < 0) currentIndex = images.length - 1;
+    goToSlide(sliderId, currentIndex);
+}
+
+function nextSlide(sliderId) {
+    const slider = document.getElementById(sliderId);
+    if (!slider) return;
+    const track = slider.querySelector('.slider-track');
+    if (!track) return;
+    const images = track.querySelectorAll('img');
+    let currentIndex = slideIndexes[sliderId] || 0;
+    currentIndex++;
+    if (currentIndex >= images.length) currentIndex = 0;
+    goToSlide(sliderId, currentIndex);
+}
+
+// ============================================ //
+// WISHLIST TOGGLE (Seller)
+// ============================================ //
+function showWishlistToast(message, isError) {
+    let toast = document.getElementById('wishlistToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'wishlistToast';
+        toast.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:14px 22px;border-radius:10px;color:#fff;font-weight:600;font-size:14px;z-index:9999;box-shadow:0 10px 25px rgba(0,0,0,0.15);transition:opacity .3s,transform .3s;opacity:0;transform:translateY(10px);';
+        document.body.appendChild(toast);
+    }
+    toast.style.background = isError ? '#DC2626' : '#16A34A';
+    toast.textContent = message;
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+    clearTimeout(toast._hideTimer);
+    toast._hideTimer = setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+    }, 2500);
+}
+
+function toggleWishlistSeller(el) {
+    const propertyId = el.getAttribute('data-id');
+    fetch('toggle-wishlist.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+        body: 'ajax=1&property_id=' + encodeURIComponent(propertyId)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'login_required') {
+            showWishlistToast('Please login to use wishlist', true);
+            setTimeout(() => { window.location.href = 'login.php'; }, 1200);
+        } else if (data.status === 'added') {
+            el.classList.add('active');
+            showWishlistToast('Added to wishlist ❤️', false);
+        } else if (data.status === 'removed') {
+            el.classList.remove('active');
+            showWishlistToast('Removed from wishlist', false);
+        } else {
+            showWishlistToast(data.message || 'Something went wrong', true);
+        }
+    })
+    .catch(() => showWishlistToast('Network error, please try again', true));
+}
+
+// ============================================ //
+// INIT SLIDERS
+// ============================================ //
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.card-image-slider').forEach(function(slider) {
+        const track = slider.querySelector('.slider-track');
+        if (track) {
+            const images = track.querySelectorAll('img');
+            initSlider(slider.id, images.length);
+        }
+    });
+});
+</script>
+
 </body>
 </html>
