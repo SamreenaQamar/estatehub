@@ -45,6 +45,8 @@ $header_pic_path = "uploads/profiles/" . $header_profile_pic;
 $has_header_pic = !empty($header_profile_pic) && file_exists($header_pic_path);
 ?>
 
+<?php /* ===== CONDITIONAL HEADER – hide when $hide_navbar = true ===== */ ?>
+<?php if (!isset($hide_navbar) || !$hide_navbar): ?>
 <header class="header">
     <div class="header-container">
         <div class="logo">
@@ -121,6 +123,7 @@ $has_header_pic = !empty($header_profile_pic) && file_exists($header_pic_path);
         </button>
     </div>
 </header>
+<?php endif; /* end conditional header */ ?>
 
 <script>
 document.addEventListener('click', function(e) {

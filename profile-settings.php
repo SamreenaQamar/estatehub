@@ -198,6 +198,13 @@ if (isset($_POST['change_password'])) {
 // HANDLE ACCOUNT DELETION
 // ----------------------------------------------------------------------
 if (isset($_POST['delete_account'])) {
+    // Delete profile picture files
+    $found_files = glob("uploads/profiles/seller_" . $seller_id . "_*");
+    if ($found_files) {
+        foreach ($found_files as $file) {
+            if (file_exists($file)) unlink($file);
+        }
+    }
     mysqli_query($conn, "DELETE FROM users WHERE id = $seller_id");
     session_destroy();
     header("Location: index.php");
@@ -241,7 +248,23 @@ if ($result && mysqli_num_rows($result) > 0) {
     $total_messages = mysqli_fetch_assoc($result)['total'] ?? 0;
 }
 
-// For profile completion
+// Extra stats for left card
+$my_properties_count = 0;
+$res = mysqli_query($conn, "SELECT COUNT(*) as total FROM properties WHERE user_id = $seller_id");
+if ($res && mysqli_num_rows($res) > 0) {
+    $my_properties_count = mysqli_fetch_assoc($res)['total'] ?? 0;
+}
+
+$total_views = 0;
+$res = mysqli_query($conn, "SHOW COLUMNS FROM properties LIKE 'views'");
+if ($res && mysqli_num_rows($res) > 0) {
+    $res2 = mysqli_query($conn, "SELECT SUM(views) as total FROM properties WHERE user_id = $seller_id");
+    if ($res2 && mysqli_num_rows($res2) > 0) {
+        $total_views = mysqli_fetch_assoc($res2)['total'] ?? 0;
+    }
+}
+
+// Profile completion
 $fields = ['full_name', 'email', 'phone', 'bio'];
 if ($has_city_column) $fields[] = 'city';
 $filled = 0;
@@ -253,7 +276,6 @@ $completion = round(($filled / count($fields)) * 100);
 $page_title = 'Profile Settings';
 $current_page = basename($_SERVER['PHP_SELF']);
 $user_name = $_SESSION['user_name'] ?? 'Seller';
-$avatar_path = $profile_pic_path; // use for topbar avatar
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -270,7 +292,7 @@ $avatar_path = $profile_pic_path; // use for topbar avatar
 
         .dashboard-wrapper { display:flex; min-height:100vh; background:#f4f6f5; }
 
-        /* ===== SIDEBAR (exactly like seller dashboard) ===== */
+        /* ===== SIDEBAR (seller version, unchanged) ===== */
         .sidebar {
             width: 250px;
             min-width: 250px;
@@ -395,7 +417,7 @@ $avatar_path = $profile_pic_path; // use for topbar avatar
             box-shadow:0 8px 20px rgba(220,38,38,.35) !important;
         }
 
-        /* ===== TOP BAR ===== */
+        /* ===== TOP BAR (seller version, unchanged) ===== */
         .topbar {
             display: flex;
             align-items: center;
@@ -465,372 +487,240 @@ $avatar_path = $profile_pic_path; // use for topbar avatar
         .main-content { flex:1; overflow-y:auto; }
         .content-inner { padding:28px 32px 40px; }
 
-        /* ===== PROFILE CONTENT ===== */
-        .profile-header {
+        /* ===== PAGE HEADER ===== */
+        .page-header {
             margin-bottom:28px;
         }
-        .profile-header h1 {
+        .page-header h1 {
             font-size:24px;
             font-weight:800;
             color:#0b1a2e;
         }
-        .profile-header p {
-            color:#64748b;
+        .page-header p {
             font-size:14px;
+            color:#64748b;
             margin-top:4px;
         }
 
-        .profile-grid{
-    display:grid;
-    grid-template-columns:300px 1fr;
-    gap:24px;
-    align-items:start;
-}
-.profile-sidebar,
-.profile-card,
-.profile-side-card{
-    height:fit-content;
-    align-self:start;
-}
-
-/* Left Card */
-        .profile-card {
-            background:#fff;
-            border-radius:20px;
-            padding:24px;
-            border:1px solid #edf2f7;
-            text-align:center;
-        }
-        .profile-avatar-wrapper {
-            position:relative;
-            width:120px;
-            height:120px;
-            margin:0 auto;
-        }
-        .profile-avatar {
-            width:120px;
-            height:120px;
-            border-radius:50%;
-            object-fit:cover;
-            border:4px solid #fff;
-            box-shadow:0 4px 20px rgba(14,122,78,0.15);
-        }
-        .avatar-upload-overlay {
-            position:absolute;
-            bottom:0;
-            right:0;
-            background:#0E7A4E;
-            color:#fff;
-            width:34px;
-            height:34px;
-            border-radius:50%;
+        /* ===== ALERTS ===== */
+        .alert {
+            padding:14px 20px;
+            border-radius:14px;
+            margin-bottom:20px;
+            font-size:14px;
+            font-weight:600;
             display:flex;
             align-items:center;
-            justify-content:center;
-            cursor:pointer;
-            border:3px solid #fff;
-            transition:0.3s;
-        }
-        .avatar-upload-overlay:hover { background:#0a5c3a; transform:scale(1.05); }
-        .dp-form input { display:none; }
-
-        .profile-name {
-            font-size:20px;
-            font-weight:800;
-            margin-top:12px;
-        }
-        .profile-role {
-            display:inline-block;
-            background:#ecfdf5;
-            color:#0E7A4E;
-            font-size:12px;
-            font-weight:700;
-            padding:3px 14px;
-            border-radius:20px;
-            margin-top:4px;
-        }
-        .profile-email {
-            font-size:13px;
-            color:#64748b;
-            margin-top:6px;
-        }
-        .profile-email i { margin-right:4px; color:#0E7A4E; }
-
-        .completion-section {
-            margin-top:16px;
-            padding-top:14px;
-            border-top:1px solid #edf2f7;
-        }
-        .completion-label {
-            display:flex;
-            justify-content:space-between;
-            font-size:12px;
-            font-weight:600;
-            color:#64748b;
-            margin-bottom:4px;
-        }
-        .completion-bar {
-            height:5px;
-            background:#edf2f7;
-            border-radius:10px;
-            overflow:hidden;
-        }
-        .completion-bar .fill {
-            height:100%;
-            background:linear-gradient(90deg,#0E7A4E,#16a34a);
-            border-radius:10px;
-            transition:width 0.6s ease;
-        }
-
-        .photo-actions {
-            margin-top:20px;
-            display:flex;
-            flex-direction:column;
             gap:10px;
         }
-        .btn-change {
-            background:linear-gradient(135deg,#0E7A4E,#16a34a);
-            color:#fff;
-            border:none;
-            padding:10px;
-            border-radius:10px;
-            font-weight:700;
-            cursor:pointer;
-            transition:0.3s;
+        .alert-success { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
+        .alert-error { background:#fee2e2; color:#dc2626; border:1px solid #fca5a5; }
+        .alert-warning { background:#fef3c7; color:#b45309; border:1px solid #fde68a; }
+
+        /* ===== PROFILE GRID ===== */
+        .profile-page-grid { display:grid; grid-template-columns:300px 1fr; gap:24px; align-items:start; }
+
+        /* ===== LEFT PROFILE CARD ===== */
+        .profile-side-card {
+            background:#fff; border-radius:18px; overflow:hidden;
+            border:1px solid #edf2f7; 
         }
-        .btn-change:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(14,122,78,0.3); }
-        .btn-delete {
-            background:#fef2f2;
-            color:#dc2626;
-            border:1.5px solid #fecaca;
-            padding:10px;
-            border-radius:10px;
-            font-weight:700;
-            cursor:pointer;
-            transition:0.3s;
+        .profile-side-banner { height:110px; background:linear-gradient(135deg, #0E7A4E, #16a34a); position:relative; }
+        .profile-side-avatar-wrap { display:flex; justify-content:center; margin-top:-65px; position:relative; }
+        .profile-side-avatar {
+            width:130px; height:130px; border-radius:50%; overflow:hidden; margin:auto;
+            border:5px solid #fff; box-shadow:0 10px 25px rgba(0,0,0,0.15);
+            background:#f5f5f5; display:flex; align-items:center; justify-content:center;
+            cursor:pointer; transition:all .3s ease;
+        }
+        .profile-side-avatar:hover { transform:scale(1.03); }
+        .profile-side-avatar img { width:100%; height:100%; object-fit:cover; }
+        .default-avatar { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:50px; color:#0E7A4E; }
+
+        .profile-side-body { text-align:center; padding:12px 24px 24px; }
+        .profile-side-body h2 { font-size:19px; font-weight:800; color:#0b1a2e; margin-top:4px; }
+        .verified-badge {
+            display:inline-flex; align-items:center; gap:6px; background:#ecfdf5;
+            color:#059669; padding:4px 14px; border-radius:50px; font-size:12px; font-weight:700; margin:8px 0 16px;
+        }
+        .profile-side-contact { display:flex; flex-direction:column; align-items:center; gap:8px; padding-top:6px; }
+        .contact-item { display:flex; justify-content:center; align-items:center; gap:8px; font-size:13px; color:#475569; font-weight:500; }
+        .contact-item i { color:#94a3b8; width:16px; text-align:center; }
+
+        .profile-side-stats {
+            display:grid; grid-template-columns:1fr 1fr; gap:12px;
+            padding:20px 24px 12px; border-top:1px solid #edf2f7; margin-top:6px;
+        }
+        .stat-box { background:transparent; border-radius:14px; padding:6px 8px; text-align:center; }
+        .stat-box i { color:#475569; font-size:17px; margin-bottom:8px; display:block; }
+        .stat-box.views i { color:#0E7A4E; }
+        .stat-box .num { font-size:19px; font-weight:800; color:#0b1a2e; display:block; }
+        .stat-box .lbl { font-size:11px; color:#94a3b8; font-weight:600; }
+
+        .profile-side-completion { padding:4px 24px 20px; }
+        .profile-side-completion .row { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+        .profile-side-completion .row span:first-child { font-size:13px; font-weight:700; color:#0b1a2e; }
+        .profile-side-completion .row span:last-child { font-size:13px; font-weight:800; color:#0E7A4E; }
+        .completion-bar { height:7px; background:#edf2f7; border-radius:10px; overflow:hidden; }
+        .completion-bar .fill { height:100%; background:linear-gradient(90deg, #0E7A4E, #16a34a); border-radius:10px; transition:width 0.6s ease; }
+
+        .photo-actions { margin-top:20px; padding:0 24px 20px; display:flex; flex-direction:column; gap:10px; }
+
+        .change-photo-btn {
+            width:100%; height:45px; border-radius:12px; font-weight:700; cursor:pointer;
+            background:#0E7A4E; color:#fff;
+            border:none; font-family:'Inter',sans-serif; font-size:13px;
+            display:flex; align-items:center; justify-content:center; gap:8px;
+            transition:background 0.3s ease;
+        }
+        .change-photo-btn:hover {
+            background:#0a5c3a;
+        }
+
+        .delete-photo-btn {
+            width:100%; height:45px; border-radius:12px; font-weight:700; cursor:pointer;
+            background:#fef2f2; color:#dc2626; border:1.5px solid #fecaca;
+            font-family:'Inter',sans-serif; font-size:13px;
+            display:flex; align-items:center; justify-content:center; gap:8px;
+            transition:background 0.3s ease, border-color 0.3s ease;
             text-decoration:none;
-            display:block;
-            text-align:center;
         }
-        .btn-delete:hover { background:#fee2e2; border-color:#dc2626; transform:translateY(-2px); }
+        .delete-photo-btn:hover {
+            background:#fee2e2; border-color:#dc2626;
+        }
+        .delete-photo-btn i { color:#dc2626; }
 
-        /* Right Column */
+        /* ===== RIGHT COLUMN ===== */
+        .profile-right-col { display:flex; flex-direction:column; gap:24px; }
+        .bottom-settings-row { display:grid; grid-template-columns:1.6fr 1fr; gap:24px; width:100%; align-items:stretch; }
+
         .settings-card {
-            background:#fff;
-            border-radius:20px;
-            padding:28px;
-            border:1px solid #edf2f7;
-            margin-bottom:24px;
+            background:#fff; border:1px solid #edf2f7; border-radius:18px;
+            padding:24px; box-shadow:0 3px 10px rgba(15,23,42,.03); transition:all .3s ease;
         }
-        .settings-card:last-child { margin-bottom:0; }
+        .settings-card:hover { box-shadow:0 10px 30px rgba(0,0,0,0.06); }
         .settings-card .card-header {
-            display:flex;
-            align-items:center;
-            gap:12px;
-            padding-bottom:14px;
-            margin-bottom:20px;
-            border-bottom:2px solid #f1f5f9;
+            display:flex; align-items:center; gap:14px; padding-bottom:16px;
+            margin-bottom:20px; border-bottom:1px solid #edf2f7;
         }
-        .settings-card .card-header .icon-box {
-            width:36px;
-            height:36px;
-            border-radius:10px;
-            background:#ecfdf5;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            color:#0E7A4E;
-            font-size:16px;
+        .settings-card .card-header .icon {
+            width:42px; height:42px; border-radius:12px; background:#dcfce7;
+            color:#0E7A4E; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;
         }
-        .settings-card .card-header h2 {
-            font-size:16px;
-            font-weight:700;
-            text-transform:uppercase;
-            letter-spacing:0.5px;
+        .settings-card .card-header.icon-danger .icon { background:#fee2e2; color:#dc2626; }
+        .settings-card .card-header h2 { font-size:20px; font-weight:700; color:#0b1a2e; margin:0; }
+        .settings-card .card-desc { font-size:14px; color:#94a3b8; margin-bottom:20px; }
+
+        .form-group { margin-bottom:18px; }
+        .form-group label { display:block; font-size:12px; font-weight:700; color:#0b1a2e; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.3px; }
+        .form-group input, .form-group textarea {
+            width:100%; padding:11px 14px; border:2px solid #e9ecef;
+            border-radius:12px; font-size:14px; transition:.3s;
+            font-family:'Inter',sans-serif; color:#0b1a2e;
+        }
+        .form-group textarea { height:auto; min-height:80px; padding:12px 14px; resize:vertical; }
+        .form-group input:focus, .form-group textarea:focus {
+            outline:none; border-color:#0E7A4E; box-shadow:0 0 0 4px rgba(14,122,78,.10);
+        }
+        .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+        .email-display {
+            padding:11px 16px; background:#f8fafc; border:2px solid #e9ecef;
+            border-radius:12px; color:#64748b; font-weight:500;
+            font-size:14px; line-height:1.5; height:50px; display:flex; align-items:center;
         }
 
-        .form-group {
-            margin-bottom:16px;
+        .password-field { position:relative; }
+        .password-field input { padding-right:44px; }
+        .password-toggle {
+            position:absolute; right:14px; top:50%; transform:translateY(-50%);
+            background:none; border:none; color:#94a3b8; cursor:pointer; font-size:15px; padding:4px;
         }
-        .form-group label {
-            display:block;
-            font-size:12px;
-            font-weight:700;
-            color:#0b1a2e;
-            text-transform:uppercase;
-            letter-spacing:0.3px;
-            margin-bottom:4px;
-        }
-        .form-group input,
-        .form-group textarea {
-            width:100%;
-            padding:10px 14px;
-            border:2px solid #e9ecef;
-            border-radius:10px;
-            font-size:14px;
-            transition:0.3s;
-        }
-        .form-group input:focus,
-        .form-group textarea:focus {
-            outline:none;
-            border-color:#0E7A4E;
-            box-shadow:0 0 0 3px rgba(14,122,78,0.08);
-        }
-        .form-group input:disabled {
-            background:#f1f5f9;
-            cursor:not-allowed;
-        }
-        .form-row {
-            display:grid;
-            grid-template-columns:1fr 1fr;
-            gap:16px;
-        }
+        .password-toggle:hover { color:#475569; }
 
+        /* ===== BUTTONS – fit text, green theme ===== */
         .btn {
-            padding:10px 22px;
-            border:none;
-            border-radius:10px;
-            font-size:13px;
-            font-weight:700;
-            cursor:pointer;
-            transition:0.3s;
-            display:inline-flex;
-            align-items:center;
-            gap:8px;
-            text-transform:uppercase;
-            letter-spacing:0.5px;
+            padding: 10px 22px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-family: 'Inter', sans-serif;
+            width: auto;
         }
         .btn-primary {
-            background:linear-gradient(135deg,#0E7A4E,#16a34a);
-            color:#fff;
-            box-shadow:0 3px 12px rgba(14,122,78,0.2);
+            background: #0E7A4E;
+            color: #fff;
         }
         .btn-primary:hover {
-            transform:translateY(-2px);
-            box-shadow:0 6px 20px rgba(14,122,78,0.3);
+            background: #0a5c3a;
         }
-        .btn-danger {
-            background:#ef4444;
-            color:#fff;
+        .btn-block {
+            width: 100%;
         }
-        .btn-danger:hover { background:#dc2626; transform:translateY(-2px); }
-        .btn-block { width:100%; justify-content:center; }
 
-        .alert {
-            padding:10px 16px;
-            border-radius:10px;
-            margin-bottom:16px;
-            font-weight:600;
-            display:flex;
-            align-items:center;
-            gap:10px;
-            font-size:13px;
-        }
-        .alert-success { background:#dcfce7; color:#166534; border-left:3px solid #22c55e; }
-        .alert-error { background:#fee2e2; color:#991b1b; border-left:3px solid #ef4444; }
-
-        .password-field {
-            position:relative;
-        }
-        .password-field input {
-            padding-right:44px;
-        }
-        .password-toggle {
-            position:absolute;
-            right:14px;
-            top:50%;
-            flex:1;
-            transform:translateY(-50%);
-            background:none;
-            border:none;
-            color:#94a3b8;
-            cursor:pointer;
-            font-size:16px;
-        }
-        .password-toggle:hover { color:#0b1a2e; }
-
-.account-zone-card{
-    display:flex;
-    flex-direction:column;
-    height:100%;
-    min-height:420px;   /* Card ki height */
-}
+        /* ===== ACCOUNT ZONE ===== */
         .account-zone-notice {
-            background:#fffbeb;
-            border:1px solid #fde68a;
-            border-radius:12px;
-            padding:14px 16px;
-            display:flex;
-                        flex:1;
-
-            gap:12px;
-            margin-bottom:20px;
+            background:#fffbeb; border:1px solid #fde68a; border-radius:14px;
+            padding:14px 16px; display:flex; gap:12px; width:100%; align-items:flex-start; margin:0 auto 24px;
         }
-        .account-zone-notice i {
-            color:#f59e0b;
-            font-size:16px;
-            margin-top:2px;
-        }
-        .account-zone-notice h4 {
-            font-size:13px;
-            font-weight:700;
-            color:#92400e;
-        }
-        .account-zone-notice p {
-            font-size:12px;
-            color:#92400e;
-            line-height:1.5;
-        }
+        .account-zone-notice i { color:#f59e0b; font-size:16px; width:20px; margin-top:2px; flex-shrink:0; }
+        .account-zone-notice h4 { font-size:13px; font-weight:700; color:#92400e; margin:0 0 4px; }
+        .account-zone-notice p { font-size:12px; color:#92400e; line-height:1.5; margin:0; }
 
         .zone-btn {
-            width:100%;
-            padding:12px;
-            border-radius:10px;
-            font-size:14px;
-            font-weight:700;
-            border:1.5px solid #e9ecef;
-            background:#fff;
-            color:#475569;
-            cursor:pointer;
-            transition:0.3s;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            gap:4px;
-            text-decoration:none;
+            width:100%; height:50px; margin:0 0 12px 0; border-radius:12px;
+            font-size:14px; font-weight:600; border:1.5px solid #e9ecef;
+            background:#fff; color:#475569; cursor:pointer;
+            transition:background 0.3s ease, border-color 0.3s ease;
+            display:flex; align-items:center; justify-content:center; gap:8px;
+            text-decoration:none; font-family:'Inter',sans-serif;
         }
-        .zone-btn:hover { transform:translateY(-2px); }
-        .logout-zone-btn {
-            color:#ef4444;
-            border-color:#fecaca;
-            margin-bottom:9px;
-        }
-        .logout-zone-btn:hover { background:#fef2f2; border-color:#ef4444; }
-        .delete-zone-btn {
-            background:#ef4444;
-            color:#fff;
-            border-color:#ef4444;
-        }
-        .delete-zone-btn:hover { background:#dc2626; border-color:#dc2626; }
+        .logout-zone-btn { color:#dc2626; border-color:#fecaca; }
+        .logout-zone-btn:hover { background:#fef2f2; border-color:#dc2626; }
+        .delete-zone-btn { background:#dc2626; color:#fff; border-color:#dc2626; margin-bottom:0; }
+        .delete-zone-btn:hover { background:#b91c1c; border-color:#b91c1c; }
+
+        .page-footer { text-align:center; font-size:12px; color:#94a3b8; padding:24px 0 4px; }
 
         @media (max-width:1100px) {
             .sidebar { position:fixed; left:-280px; transition:left 0.3s; }
             .sidebar.open { left:0; }
             .topbar-menu-btn { display:flex; }
+            .profile-page-grid { grid-template-columns:1fr; }
+        }
+        @media (max-width:991px) {
+            .bottom-settings-row { grid-template-columns:1fr; }
         }
         @media (max-width:768px) {
-            .profile-grid { grid-template-columns:1fr; }
-            .content-inner { padding:18px; }
-            .topbar { padding:12px 18px; }
+            .content-inner { padding:16px; }
+            .topbar { padding:12px 16px; flex-wrap:wrap; }
             .form-row { grid-template-columns:1fr; }
-            .user-info { display:none; }
+            .settings-card { padding:20px; }
+            .profile-side-avatar { width:100px; height:100px; }
+            .profile-side-banner { height:80px; }
+            .profile-side-avatar-wrap { margin-top:-50px; }
+            .topbar-search { max-width:none; }
+        }
+        @media (max-width:500px) {
+            .profile-side-avatar { width:80px; height:80px; }
+            .profile-side-banner { height:60px; }
+            .profile-side-avatar-wrap { margin-top:-40px; }
+            .photo-actions { padding:0 16px 16px; }
+            .change-photo-btn, .delete-photo-btn { height:40px; font-size:12px; }
         }
     </style>
 </head>
 <body>
 <div class="dashboard-wrapper">
 
-    <!-- ===== SIDEBAR (exactly like seller dashboard) ===== -->
+    <!-- ===== SIDEBAR (seller version, unchanged) ===== -->
     <aside class="sidebar" id="sellerSidebar">
         <div class="logo">
             <a href="index.php">
@@ -900,7 +790,7 @@ $avatar_path = $profile_pic_path; // use for topbar avatar
     <!-- ===== MAIN CONTENT ===== -->
     <div class="main-content">
 
-        <!-- TOP BAR (same as dashboard) -->
+        <!-- TOP BAR (seller version, unchanged) -->
         <header class="topbar">
             <button class="topbar-menu-btn" onclick="document.getElementById('sellerSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -936,23 +826,23 @@ $avatar_path = $profile_pic_path; // use for topbar avatar
         <div class="content-inner">
 
             <!-- Page Header -->
-            <div class="profile-header">
+            <div class="page-header">
                 <h1>Profile Settings</h1>
-                <p>Update your personal information and account details</p>
+                <p>Manage your personal information and account settings</p>
             </div>
 
             <!-- Alerts -->
             <?php if ($message): ?>
-                <div class="alert <?php echo $messageType === 'error' ? 'alert-error' : 'alert-success'; ?>">
-                    <i class="fas <?php echo $messageType === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'; ?>"></i>
+                <div class="alert alert-<?php echo $messageType === 'error' ? 'error' : 'success'; ?>">
+                    <i class="fas fa-<?php echo $messageType === 'error' ? 'exclamation-circle' : 'check-circle'; ?>"></i>
                     <?php echo htmlspecialchars($message); ?>
                 </div>
             <?php endif; ?>
 
             <?php if (!$has_pic_column): ?>
-                <div class="alert alert-error">
+                <div class="alert alert-warning">
                     <i class="fas fa-database"></i>
-                    Run SQL: <code>ALTER TABLE users ADD COLUMN profile_pic VARCHAR(255) DEFAULT NULL AFTER phone;</code>
+                    Run SQL: <code style="background:#fef3c7; padding:2px 6px; border-radius:4px; font-size:12px;">ALTER TABLE users ADD COLUMN profile_pic VARCHAR(255) DEFAULT NULL AFTER phone;</code>
                 </div>
             <?php endif; ?>
 
@@ -961,23 +851,59 @@ $avatar_path = $profile_pic_path; // use for topbar avatar
                 <input type="file" id="picInput" name="profile_pic" accept="image/*" onchange="this.form.submit()">
             </form>
 
-            <!-- Profile Grid -->
-            <div class="profile-grid">
+            <!-- PROFILE GRID -->
+            <div class="profile-page-grid">
 
-                <!-- LEFT CARD -->
-                <div class="profile-card">
-                    <div class="profile-avatar-wrapper">
-                        <img src="<?php echo !empty($profile_pic_path) ? $profile_pic_path : 'https://ui-avatars.com/api/?background=0E7A4E&color=fff&size=120&name=' . urlencode($user_name); ?>" alt="Profile" class="profile-avatar" id="profilePreview">
-                        <label for="picInput" class="avatar-upload-overlay" title="Change Photo">
-                            <i class="fas fa-camera"></i>
-                        </label>
+                <!-- LEFT PROFILE CARD -->
+                <div class="profile-side-card">
+                    <div class="profile-side-banner"></div>
+
+                    <div class="profile-side-avatar-wrap">
+                        <div class="profile-side-avatar" onclick="document.getElementById('picInput').click()" title="Click to change photo">
+                            <?php if (!empty($profile_pic_path)): ?>
+                                <img src="<?php echo $profile_pic_path; ?>" alt="Profile" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                                <div class="default-avatar" style="display:none;">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                            <?php else: ?>
+                                <div class="default-avatar">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                            <?php endif; ?>
+                        </div>
                     </div>
-                    <div class="profile-name"><?php echo htmlspecialchars($user['full_name'] ?? $user_name); ?></div>
-                    <div class="profile-role">Verified Seller</div>
-                    <div class="profile-email"><i class="fas fa-envelope"></i> <?php echo htmlspecialchars($user['email'] ?? ''); ?></div>
 
-                    <div class="completion-section">
-                        <div class="completion-label">
+                    <div class="profile-side-body">
+                        <h2><?php echo htmlspecialchars($user['full_name'] ?? $user_name); ?></h2>
+                        <span class="verified-badge"><i class="fas fa-check-circle"></i> Verified Seller</span>
+
+                        <div class="profile-side-contact">
+                            <div class="contact-item">
+                                <i class="fas fa-envelope"></i>
+                                <span><?php echo htmlspecialchars($user['email'] ?? ''); ?></span>
+                            </div>
+                            <div class="contact-item">
+                                <i class="fas fa-phone"></i>
+                                <span><?php echo htmlspecialchars($user['phone'] ?? ''); ?></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="profile-side-stats">
+                        <div class="stat-box">
+                            <i class="fas fa-home"></i>
+                            <span class="num"><?php echo (int)$my_properties_count; ?></span>
+                            <span class="lbl">Properties</span>
+                        </div>
+                        <div class="stat-box views">
+                            <i class="fas fa-eye"></i>
+                            <span class="num"><?php echo number_format((float)$total_views / 1000, 1); ?>K</span>
+                            <span class="lbl">Views</span>
+                        </div>
+                    </div>
+
+                    <div class="profile-side-completion">
+                        <div class="row">
                             <span>Profile Completion</span>
                             <span><?php echo $completion; ?>%</span>
                         </div>
@@ -987,11 +913,14 @@ $avatar_path = $profile_pic_path; // use for topbar avatar
                     </div>
 
                     <div class="photo-actions">
-                        <button type="button" class="btn-change" onclick="document.getElementById('picInput').click()">
+                        <button type="button" class="change-photo-btn" onclick="document.getElementById('picInput').click()">
                             <i class="fas fa-image"></i> Change Photo
                         </button>
+
                         <?php if (!empty($profile_pic_path)): ?>
-                            <a href="profile-settings.php?delete_photo=1" class="btn-delete" onclick="return confirm('Are you sure you want to remove your profile picture?');">
+                            <a href="profile-settings.php?delete_photo=1"
+                               class="delete-photo-btn"
+                               onclick="return confirm('Are you sure you want to remove your profile picture?');">
                                 <i class="fas fa-trash-alt"></i> Delete Photo
                             </a>
                         <?php endif; ?>
@@ -999,93 +928,107 @@ $avatar_path = $profile_pic_path; // use for topbar avatar
                 </div>
 
                 <!-- RIGHT COLUMN -->
-                <div>
+                <div class="profile-right-col">
 
                     <!-- Personal Information -->
                     <div class="settings-card">
                         <div class="card-header">
-                            <div class="icon-box"><i class="fas fa-user"></i></div>
+                            <span class="icon"><i class="fas fa-user"></i></span>
                             <h2>Personal Information</h2>
                         </div>
+
                         <form method="POST">
-                            <div class="form-group">
-                                <label><i class="fas fa-user"></i> Full Name</label>
-                                <input type="text" name="full_name" value="<?php echo htmlspecialchars($user['full_name'] ?? ''); ?>" required>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label><i class="fas fa-user"></i> Full Name</label>
+                                    <input type="text" name="full_name" value="<?php echo htmlspecialchars($user['full_name'] ?? ''); ?>" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label><i class="fas fa-envelope"></i> Email Address</label>
+                                    <div class="email-display"><?php echo htmlspecialchars($user['email'] ?? ''); ?></div>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label><i class="fas fa-envelope"></i> Email Address</label>
-                                <input type="email" value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>" disabled>
-                            </div>
+
                             <div class="form-row">
                                 <div class="form-group">
                                     <label><i class="fas fa-phone"></i> Phone Number</label>
-                                    <input type="text" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" placeholder="+92 300 1234567">
+                                    <input type="text" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>">
                                 </div>
+
                                 <?php if ($has_city_column): ?>
                                     <div class="form-group">
                                         <label><i class="fas fa-map-marker-alt"></i> City</label>
-                                        <input type="text" name="city" value="<?php echo htmlspecialchars($user['city'] ?? ''); ?>" placeholder="e.g. Lahore">
+                                        <input type="text" name="city" value="<?php echo htmlspecialchars($user['city'] ?? ''); ?>">
                                     </div>
                                 <?php endif; ?>
                             </div>
+
                             <?php if ($has_bio_column): ?>
                                 <div class="form-group">
-                                    <label><i class="fas fa-file-alt"></i> Bio</label>
-                                    <textarea name="bio" rows="3" placeholder="Write a short bio..."><?php echo htmlspecialchars($user['bio'] ?? ''); ?></textarea>
+                                    <label><i class="fas fa-file-alt"></i> Bio (Optional)</label>
+                                    <textarea name="bio" rows="4" placeholder="Write a short bio..."><?php echo htmlspecialchars($user['bio'] ?? ''); ?></textarea>
                                 </div>
                             <?php endif; ?>
+
                             <button type="submit" name="update_profile" class="btn btn-primary">
                                 <i class="fas fa-save"></i> Save Changes
                             </button>
                         </form>
                     </div>
 
-                    <!-- Change Password + Account Zone in two columns -->
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+                    <!-- Change Password + Account Zone -->
+                    <div class="bottom-settings-row">
 
                         <!-- Change Password -->
-                        <div class="settings-card" style="margin-bottom:0;">
+                        <div class="settings-card">
                             <div class="card-header">
-                                <div class="icon-box"><i class="fas fa-lock"></i></div>
+                                <span class="icon"><i class="fas fa-lock"></i></span>
                                 <h2>Change Password</h2>
                             </div>
+
                             <form method="POST">
                                 <div class="form-group">
-                                    <label>Current Password</label>
+                                    <label><i class="fas fa-key"></i> Current Password</label>
                                     <div class="password-field">
                                         <input type="password" name="current_password" placeholder="Enter current password" required>
                                         <button type="button" class="password-toggle" onclick="togglePw(this)"><i class="fas fa-eye"></i></button>
                                     </div>
                                 </div>
+
                                 <div class="form-group">
-                                    <label>New Password</label>
+                                    <label><i class="fas fa-lock"></i> New Password</label>
                                     <div class="password-field">
-                                        <input type="password" name="new_password" placeholder="Min 6 characters" required>
+                                        <input type="password" name="new_password" placeholder="Enter new password" required>
                                         <button type="button" class="password-toggle" onclick="togglePw(this)"><i class="fas fa-eye"></i></button>
                                     </div>
                                 </div>
+
                                 <div class="form-group">
-                                    <label>Confirm Password</label>
+                                    <label><i class="fas fa-check-circle"></i> Confirm Password</label>
                                     <div class="password-field">
                                         <input type="password" name="confirm_password" placeholder="Confirm new password" required>
                                         <button type="button" class="password-toggle" onclick="togglePw(this)"><i class="fas fa-eye"></i></button>
                                     </div>
                                 </div>
-                                <button type="submit" name="change_password" class="btn btn-primary btn-block">
-                                    <i class="fas fa-sync-alt"></i> Update Password
+
+                                <button type="submit" name="change_password" class="btn btn-primary">
+                                    <i class="fas fa-lock"></i> Update Password
                                 </button>
                             </form>
                         </div>
 
                         <!-- Account Zone -->
-                        <div class="settings-card" style="margin-bottom:0;">
-                            <div class="card-header">
-                                <div class="icon-box" style="background:#fef2f2; color:#ef4444;"><i class="fas fa-exclamation-triangle"></i></div>
-                                <h2 style="color:#991b1b;">Account Zone</h2>
+                        <div class="settings-card">
+                            <div class="card-header icon-danger">
+                                <span class="icon"><i class="fas fa-triangle-exclamation"></i></span>
+                                <h2>Account Zone</h2>
                             </div>
 
+                            <p class="card-desc">Manage your account actions.</p>
+
                             <div class="account-zone-notice">
-                                <i class="fas fa-shield-alt"></i>
+                                <i class="fas fa-shield-halved"></i>
                                 <div>
                                     <h4>Delete your account permanently.</h4>
                                     <p>All your data, properties and messages will be removed.</p>
@@ -1093,7 +1036,7 @@ $avatar_path = $profile_pic_path; // use for topbar avatar
                             </div>
 
                             <a href="logout.php" class="zone-btn logout-zone-btn">
-                                <i class="fas fa-sign-out-alt"></i> Logout
+                                <i class="fas fa-right-from-bracket"></i> Logout
                             </a>
 
                             <form method="POST" onsubmit="return confirm('Are you sure you want to delete your account? This cannot be undone!');">
@@ -1103,44 +1046,46 @@ $avatar_path = $profile_pic_path; // use for topbar avatar
                             </form>
                         </div>
 
-                    </div><!-- end password+account grid -->
+                    </div>
+                </div>
+            </div>
 
-                </div><!-- right column -->
-            </div><!-- profile-grid -->
+            <div class="page-footer">&copy; <?php echo date('Y'); ?> EstateHub. All rights reserved.</div>
 
-        </div><!-- content-inner -->
-    </div><!-- main-content -->
-</div><!-- dashboard-wrapper -->
+        </div>
+    </div>
+</div>
 
 <script>
-    // Toggle password visibility
-    function togglePw(btn) {
-        var input = btn.previousElementSibling;
-        var icon  = btn.querySelector('i');
-        if (input.type === 'password') {
-            input.type = 'text';
-            icon.classList.remove('fa-eye');
-            icon.classList.add('fa-eye-slash');
-        } else {
-            input.type = 'password';
-            icon.classList.remove('fa-eye-slash');
-            icon.classList.add('fa-eye');
-        }
-    }
-
-    // Auto-dismiss alerts
-    document.addEventListener('DOMContentLoaded', function() {
-        var alerts = document.querySelectorAll('.alert');
-        alerts.forEach(function(alert) {
+document.addEventListener('DOMContentLoaded', function() {
+    var alerts = document.querySelectorAll('.alert');
+    alerts.forEach(function(alert) {
+        setTimeout(function() {
+            alert.style.opacity = '0';
+            alert.style.transform = 'translateY(-10px)';
             setTimeout(function() {
-                alert.style.opacity = '0';
-                alert.style.transform = 'translateY(-10px)';
-                setTimeout(function() {
-                    if (alert.parentNode) alert.remove();
-                }, 500);
-            }, 4000);
-        });
+                if (alert.parentNode) {
+                    alert.remove();
+                }
+            }, 500);
+        }, 4000);
     });
+});
+
+function togglePw(btn) {
+    var input = btn.previousElementSibling;
+    var icon = btn.querySelector('i');
+
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
 </script>
 
 </body>

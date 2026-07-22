@@ -170,7 +170,7 @@ if (isset($_POST['edit_user'])) {
 }
 
 // =========================================================
-// CHANGE STATUS - FIXED: This is where the status update happens
+// CHANGE STATUS
 // =========================================================
 if (isset($_POST['change_status'])) {
     verify_csrf();
@@ -186,26 +186,20 @@ if (isset($_POST['change_status'])) {
     ];
 
     if (isset($map[$action]) && $id > 0) {
-        // Prevent admin from blocking/deleting themselves
         if ($id === (int)$_SESSION['user_id'] && in_array($action, ['block', 'delete'], true)) {
             $message = "You cannot block or delete your own admin account.";
             $messageType = "error";
         } else {
             $new_status = $map[$action];
-            
-            // Debug: Log the action
-            error_log("Changing user $id status to $new_status via action: $action");
-            
             $stmt = mysqli_prepare($conn, "UPDATE users SET status = ? WHERE id = ?");
             mysqli_stmt_bind_param($stmt, 'si', $new_status, $id);
-            
             if (mysqli_stmt_execute($stmt)) {
                 mysqli_stmt_close($stmt);
                 $labels = [
-                    'block' => 'blocked', 
-                    'unblock' => 'unblocked', 
+                    'block' => 'blocked',
+                    'unblock' => 'unblocked',
                     'approve' => 'approved',
-                    'delete' => 'deleted (soft delete)', 
+                    'delete' => 'deleted (soft delete)',
                     'restore' => 'restored',
                 ];
                 redirect_with_flash("User has been " . $labels[$action] . " successfully.", "success");
@@ -241,7 +235,6 @@ if (in_array($filter, ['admin', 'seller', 'user'], true)) {
     $params[] = $filter;
     $types .= 's';
 } else {
-    // Show all except deleted by default
     $where[] = "status != 'deleted'";
 }
 
@@ -1115,7 +1108,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <path d="M20 21a8 8 0 1 0-16 0"/>
                     </svg>
                     Users
-                    <span class="nav-badge"><?php echo $stats['users']; ?></span>
                 </a>
             </li>
             <li>
@@ -1125,9 +1117,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <polyline points="9 22 9 12 15 12 15 22"/>
                     </svg>
                     Properties
-                    <?php if ($stats['pending'] > 0): ?>
-                        <span class="nav-badge"><?php echo $stats['pending']; ?></span>
-                    <?php endif; ?>
                 </a>
             </li>
             <li>
@@ -1136,9 +1125,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                     </svg>
                     Messages
-                    <?php if ($stats['unread'] > 0): ?>
-                        <span class="nav-badge blue"><?php echo $stats['unread']; ?></span>
-                    <?php endif; ?>
+                </a>
+            </li>
+            <!-- ===== WISHLIST LINK ===== -->
+            <li>
+                <a href="wishlist.php" class="<?php echo ($current_page == 'wishlist.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                    Wishlist
                 </a>
             </li>
         </ul>
@@ -1174,6 +1169,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     Profile
                 </a>
             </li>
+            <!-- ===== NOTIFICATIONS LINK ===== -->
+            <li>
+                <a href="notifications.php" class="<?php echo ($current_page == 'notifications.php') ? 'active' : ''; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
+                    Notifications
+                </a>
+            </li>
             <li>
                 <a href="../logout.php" class="logout-link">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1190,28 +1195,33 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- ===== MAIN CONTENT ===== -->
     <div class="main-content">
 
-        <!-- TOP BAR -->
+        <!-- TOP BAR - UPDATED: Avatar First, then Name, Bell with Badge -->
         <header class="topbar">
             <button class="topbar-menu-btn" onclick="document.getElementById('adminSidebar').classList.toggle('open')">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
 
             <div class="topbar-actions">
+                <!-- Notification Bell with Badge -->
                 <button class="icon-btn" title="Notifications" onclick="window.location.href='notifications.php'">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                    <span class="count"><?php echo $stats['unread'] > 0 ? $stats['unread'] : 0; ?></span>
+                    <?php if ($stats['unread'] > 0): ?>
+                        <span class="count"><?php echo $stats['unread'] > 9 ? '9+' : $stats['unread']; ?></span>
+                    <?php endif; ?>
                 </button>
+
+                <!-- User Chip: Avatar (left) + Name + Chevron -->
                 <a href="profile.php" class="user-chip">
-                    <div class="user-info">
-                        <span class="user-name"><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'Admin User'); ?></span>
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
                     <div class="user-avatar">
                         <?php if (!empty($profile_pic_path)): ?>
                             <img src="<?php echo $profile_pic_path; ?>" alt="Admin">
                         <?php else: ?>
-                            <i class="fas fa-user"></i>
+                            <i class="fas fa-crown"></i>
                         <?php endif; ?>
+                    </div>
+                    <div class="user-info">
+                        <span class="user-name"><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'Admin User'); ?></span>
+                        <i class="fas fa-chevron-down"></i>
                     </div>
                 </a>
             </div>
@@ -1681,14 +1691,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
 </div>
 
 <script>
-function openModal(id) {
-    document.getElementById(id).classList.add('active');
-}
-
-function closeModal(id) {
-    document.getElementById(id).classList.remove('active');
-}
-
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 function editUser(id, name, email, type, status, phone, city) {
     document.getElementById('edit_id').value = id;
     document.getElementById('edit_name').value = name;
@@ -1699,7 +1703,6 @@ function editUser(id, name, email, type, status, phone, city) {
     document.getElementById('edit_city').value = city;
     openModal('editModal');
 }
-
 function viewUser(data) {
     var rows = [
         ['Full Name', data.name],
@@ -1720,7 +1723,6 @@ function viewUser(data) {
     document.getElementById('viewBody').innerHTML = html;
     openModal('viewModal');
 }
-
 var CONFIRM_CONTENT = {
     block:   { title: 'Block User', icon: 'warn', iconClass: 'fa-ban', message: 'Are you sure you want to block this user?', warning: 'This user will not be able to login until unblocked.', btn: 'Block User', btnClass: 'btn-danger' },
     unblock: { title: 'Unblock User', icon: 'info', iconClass: 'fa-unlock', message: 'Are you sure you want to unblock this user?', warning: 'The user will regain full access immediately.', btn: 'Unblock User', btnClass: 'btn-success' },
@@ -1728,7 +1730,6 @@ var CONFIRM_CONTENT = {
     delete:  { title: 'Delete User', icon: 'warn', iconClass: 'fa-trash', message: 'Are you sure you want to delete this user?', warning: 'The account will be hidden but data will remain stored.', btn: 'Delete User', btnClass: 'btn-danger' },
     restore: { title: 'Restore User', icon: 'info', iconClass: 'fa-rotate-left', message: 'Restore this account?', warning: 'The user will regain access immediately.', btn: 'Restore User', btnClass: 'btn-primary' }
 };
-
 function openConfirm(action, id, name) {
     var c = CONFIRM_CONTENT[action];
     if (!c) return;
@@ -1744,14 +1745,11 @@ function openConfirm(action, id, name) {
     btn.className = 'btn ' + c.btnClass;
     openModal('confirmModal');
 }
-
 document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
     overlay.addEventListener('click', function(e) {
         if (e.target === this) this.classList.remove('active');
     });
 });
-
-// Auto-refresh page after status change to show updated UI
 setTimeout(function() {
     if (document.querySelector('.alert-success')) {
         location.reload();

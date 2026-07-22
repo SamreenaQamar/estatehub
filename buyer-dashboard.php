@@ -1,6 +1,6 @@
 <?php
 $page_title = 'Buyer Dashboard';
-$hide_navbar = true; // Hide top navigation bar (Home | Listings | About | Contact)
+$hide_navbar = true; // Hide top navigation bar
 require_once __DIR__ . '/includes/config.php';
 include 'includes/header.php';
 
@@ -47,6 +47,43 @@ if ($_SESSION['user_type'] != 'user' && $_SESSION['user_type'] != 'buyer') {
 $user_id = $_SESSION['user_id'];
 $user_name = $_SESSION['user_name'] ?? 'User';
 
+// ============================================================
+// PROFILE PICTURE PATH (same as seller dashboard)
+// ============================================================
+$profile_pic_path = '';
+$pic_check = mysqli_query($conn, "SHOW COLUMNS FROM users LIKE 'profile_pic'");
+$has_pic_column = mysqli_num_rows($pic_check) > 0;
+
+if ($has_pic_column) {
+    $user_query = mysqli_query($conn, "SELECT profile_pic FROM users WHERE id = $user_id");
+    if ($user_query && mysqli_num_rows($user_query) > 0) {
+        $user_data = mysqli_fetch_assoc($user_query);
+        if (!empty($user_data['profile_pic'])) {
+            $pic_file = "uploads/profiles/" . $user_data['profile_pic'];
+            if (file_exists($pic_file)) {
+                $profile_pic_path = $pic_file . '?t=' . time();
+            }
+        }
+    }
+}
+if (empty($profile_pic_path) && isset($_SESSION['profile_pic'])) {
+    $pic_file = "uploads/profiles/" . $_SESSION['profile_pic'];
+    if (file_exists($pic_file)) {
+        $profile_pic_path = $pic_file . '?t=' . time();
+    }
+}
+if (empty($profile_pic_path)) {
+    $found_files = glob("uploads/profiles/user_" . $user_id . "_*");
+    if (!empty($found_files)) {
+        $profile_pic_path = $found_files[0] . '?t=' . time();
+        $_SESSION['profile_pic'] = basename($found_files[0]);
+        if ($has_pic_column) {
+            $safe_filename = mysqli_real_escape_string($conn, basename($found_files[0]));
+            mysqli_query($conn, "UPDATE users SET profile_pic = '$safe_filename' WHERE id = $user_id");
+        }
+    }
+}
+
 // Unread messages count
 $unread_msgs = 0;
 $msg_query = mysqli_query($conn, "SELECT COUNT(*) as total FROM messages WHERE receiver_id = $user_id AND is_read = 0");
@@ -66,20 +103,19 @@ $properties_result = mysqli_query($conn, $properties_query);
         background: #f4f6f5;
     }
     .buyer-sidebar {
-        width: 250px;
-        min-width: 250px;
-        background: #000000;
-        padding: 24px 16px;
-        position: sticky;
-        top: 0;
-        height: 100vh;
-        overflow-y: auto;
-        z-index: 100;
-        border-right: 1px solid rgba(255,255,255,0.05);
-    }
-    .buyer-sidebar::-webkit-scrollbar { width:4px; }
-    .buyer-sidebar::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:10px; }
-
+    width: 250px;
+    min-width: 250px;
+    background: #000000;
+    padding: 24px 16px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow: hidden;        /* no scrolling */
+    z-index: 100;
+    border-right: 1px solid rgba(255,255,255,0.05);
+}
+/* No ::-webkit-scrollbar rules needed */
+    
     .buyer-sidebar .logo {
         padding:0 4px 20px;
         margin-bottom:20px;
@@ -194,6 +230,36 @@ $properties_result = mysqli_query($conn, $properties_query);
     .content-inner {
         padding:28px 32px 40px;
     }
+
+    /* ===== TOP BAR (like seller dashboard) ===== */
+    .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 14px 32px;
+        background: #fff;
+        border-bottom: 1px solid #e9ecef;
+        position: sticky;
+        top:0;
+        z-index:50;
+    }
+    .topbar-menu-btn { display:none; background:none; border:none; cursor:pointer; padding:6px; }
+    /* .topbar-search removed entirely */
+
+    .topbar-actions { display:flex; align-items:center; gap:10px; margin-left: auto; } /* added margin-left to push to right */
+    .user-chip { display:flex; align-items:center; gap:10px; text-decoration:none; }
+    .user-avatar {
+        width:36px; height:36px; border-radius:10px;
+        background:#0E7A4E; color:#fff;
+        display:flex; align-items:center; justify-content:center;
+        font-weight:700; font-size:15px; overflow:hidden;
+        flex-shrink:0;
+    }
+    .user-avatar img { width:100%; height:100%; object-fit:cover; }
+    .user-info { display:flex; flex-direction:column; line-height:1.2; }
+    .user-name { font-size:14px; font-weight:700; color:#0b1a2e; }
+    .user-role { font-size:12px; color:#6b7a8f; }
 
     /* ===== BUYER DASHBOARD CARDS ===== */
     .buyer-container {
@@ -327,7 +393,7 @@ $properties_result = mysqli_query($conn, $properties_query);
     /* ===== PREMIUM PROPERTY CARD (exactly like home page) ===== */
     .properties-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: 20px;
         margin-bottom: 40px;
     }
@@ -596,6 +662,32 @@ $properties_result = mysqli_query($conn, $properties_query);
 
     <!-- ===== MAIN CONTENT ===== -->
     <div class="buyer-main-content">
+
+        <!-- ===== TOP BAR (without search bar) ===== -->
+        <header class="topbar">
+            <button class="topbar-menu-btn" onclick="document.getElementById('buyerSidebar').classList.toggle('open')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+
+            <!-- SEARCH BAR REMOVED -->
+
+            <div class="topbar-actions">
+                <a href="buyer-profile.php" class="user-chip">
+                    <div class="user-avatar">
+                        <?php if(!empty($profile_pic_path)): ?>
+                            <img src="<?php echo htmlspecialchars($profile_pic_path); ?>" alt="<?php echo htmlspecialchars($user_name); ?>">
+                        <?php else: ?>
+                            <?php echo strtoupper(substr($user_name, 0, 1)); ?>
+                        <?php endif; ?>
+                    </div>
+                    <div class="user-info">
+                        <span class="user-name"><?php echo htmlspecialchars($user_name); ?></span>
+                        <span class="user-role">Buyer</span>
+                    </div>
+                </a>
+            </div>
+        </header>
+
         <div class="content-inner">
             <div class="buyer-container">
 
@@ -745,7 +837,7 @@ $properties_result = mysqli_query($conn, $properties_query);
 
 <script>
 // ============================================ //
-// SLIDER FUNCTIONS (same as home page)
+// SLIDER FUNCTIONS
 // ============================================ //
 let slideIndexes = {};
 
@@ -876,6 +968,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
-</script>
 
-<?php include 'includes/footer.php'; ?>
+// ============================================ //
+// SIDEBAR TOGGLE FOR MOBILE
+// ============================================ //
+document.addEventListener('DOMContentLoaded', function() {
+    const sidebar = document.getElementById('buyerSidebar');
+    if (sidebar) {
+        document.querySelector('.topbar-menu-btn').addEventListener('click', function() {
+            sidebar.classList.toggle('open');
+        });
+    }
+});
+</script>

@@ -598,23 +598,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_settings'])) {
                     </div>
                 </div>
 
-                <!-- Danger Zone -->
-                <div class="settings-card danger-zone">
-                    <h2>
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2">
-                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                            <path d="M2 17l10 5 10-5"/>
-                            <path d="M2 12l10 5 10-5"/>
-                        </svg>
-                        Danger Zone
-                    </h2>
-                    <div class="setting-item">
-                        <div class="setting-info">
-                            <h4 style="color: #DC2626;">Delete Account</h4>
-                            <p>Permanently delete your account and all data</p>
-                        </div>
-                        <button class="delete-account-btn" onclick="confirmDelete()">Delete Account</button>
-                    </div>
+                    
                 </div>
 
             </div>
