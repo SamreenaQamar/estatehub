@@ -9,12 +9,12 @@
     <title><?php echo isset($page_title) ? $page_title . ' - ' : ''; ?>EstateHub | Find Your Dream Home</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fraunces:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-   <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
 
 <?php
-// Unread message count (no longer used, but kept for compatibility)
+// Unread message count (kept for compatibility)
 $header_unread_count = 0;
 $header_profile_pic = '';
 if (isset($_SESSION['user_id']) && isset($conn)) {
@@ -45,76 +45,76 @@ if (isset($_SESSION['user_type'])) {
     }
 }
 
-// Check if we are on the home page to decide whether to show the role label
+// Check if we are on the home page – show role only there
 $is_home_page = (basename($_SERVER['PHP_SELF']) == 'index.php');
 
 $header_pic_path = "uploads/profiles/" . $header_profile_pic;
 $has_header_pic = !empty($header_profile_pic) && file_exists($header_pic_path);
+
+// --- Determine current page for active class ---
+$current_page = basename($_SERVER['PHP_SELF']);
+// For contact, also check contact-us.php / contact_us.php
+$is_contact = ($current_page == 'contact.php' || $current_page == 'contact-us.php' || $current_page == 'contact_us.php');
 ?>
 
 <?php /* ===== CONDITIONAL HEADER – hide when $hide_navbar = true ===== */ ?>
 <?php if (!isset($hide_navbar) || !$hide_navbar): ?>
 <header class="header">
     <div class="header-container">
+
+        <!-- LOGO -->
         <div class="logo">
             <a href="index.php">
-                <div class="logo-box">
-                    <i class="fas fa-home"></i>
-                </div>
+                <i class="fa-solid fa-house logo-icon"></i>
                 <span class="logo-text">EstateHub</span>
             </a>
         </div>
 
+        <!-- NAV MENU – dynamic active classes -->
         <nav class="nav-menu">
             <ul>
-                <li><a href="index.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>">Home</a></li>
-                <li><a href="listings.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'listings.php' ? 'active' : ''; ?>">Listings</a></li>
-                <li><a href="about.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'about.php' ? 'active' : ''; ?>">About</a></li>
-                <li><a href="contact.php" class="<?php echo basename($_SERVER['PHP_SELF']) == 'contact.php' ? 'active' : ''; ?>">Contact</a></li>
+                <li><a href="index.php" class="<?php echo ($current_page == 'index.php') ? 'active' : ''; ?>">Home</a></li>
+                <li><a href="listings.php" class="<?php echo ($current_page == 'listings.php') ? 'active' : ''; ?>">Listings</a></li>
+                <li><a href="about.php" class="<?php echo ($current_page == 'about.php') ? 'active' : ''; ?>">About</a></li>
+                <li><a href="contact.php" class="<?php echo $is_contact ? 'active' : ''; ?>">Contact</a></li>
             </ul>
         </nav>
 
+        <!-- PROFILE (right corner) -->
         <div class="header-actions">
             <?php if (isset($_SESSION['user_id'])): ?>
-                <!-- Wishlist and Messages links REMOVED -->
-             <!-- inside header-actions -->
-<div class="profile-dropdown">
-    <button type="button" class="profile-trigger-btn" onclick="document.getElementById('headerProfileMenu').classList.toggle('open')">
-        <span class="profile-avatar-btn">
-            <?php if ($has_header_pic): ?>
-                <img src="<?php echo htmlspecialchars($header_pic_path); ?>" alt="Profile">
-            <?php else: ?>
-                <span><?php echo strtoupper(substr($_SESSION['user_name'] ?? 'U', 0, 1)); ?></span>
-            <?php endif; ?>
-        </span>
-        <span class="profile-info">
-            <span class="profile-name-text"><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></span>
-            <?php if ($is_home_page && !empty($user_role_display)): ?>
-                <span class="profile-role-label"><?php echo htmlspecialchars($user_role_display); ?></span>
-            <?php endif; ?>
-        </span>
-    </button>
-    <!-- dropdown menu stays same -->
-</div>
-                    <div class="profile-dropdown-menu" id="headerProfileMenu">
-                        <div class="profile-dropdown-header">
-                            <strong><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></strong>
-                            <!-- No role badge displayed here -->
-                        </div>
-                        <a href="<?php echo $dashboard_link; ?>"><i class="fas fa-gauge"></i> Dashboard</a>
-                        <a href="logout.php"><i class="fas fa-right-from-bracket"></i> Logout</a>
+            <div class="profile-dropdown">
+                <button class="profile-trigger-btn" onclick="document.getElementById('headerProfileMenu').classList.toggle('open')">
+                    <div class="profile-avatar-btn">
+                        <?php if ($has_header_pic): ?>
+                            <img src="<?php echo htmlspecialchars($header_pic_path); ?>" alt="">
+                        <?php else: ?>
+                            <i class="fa-solid fa-user"></i>
+                        <?php endif; ?>
                     </div>
+                    <div class="profile-info">
+                        <span class="profile-name-text"><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></span>
+                        <?php if ($is_home_page && !empty($user_role_display)): ?>
+                            <span class="profile-role-label"><?php echo htmlspecialchars($user_role_display); ?></span>
+                        <?php endif; ?>
+                    </div>
+                </button>
+                <div class="profile-dropdown-menu" id="headerProfileMenu">
+                    <div class="profile-dropdown-header">
+                        <strong><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></strong>
+                    </div>
+                    <a href="<?php echo $dashboard_link; ?>"><i class="fa-solid fa-gauge"></i> Dashboard</a>
+                    <a href="logout.php"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
                 </div>
+            </div>
             <?php else: ?>
-                <!-- For guests: no wishlist link either -->
                 <a href="login.php" class="btn-outline">Login</a>
-                <a href="signup.php" class="btn-solid">Sign Up</a>
+                <a href="register.php" class="btn-solid">Register</a>
             <?php endif; ?>
         </div>
 
-        <button class="mobile-toggle">
-            <i class="fas fa-bars"></i>
-        </button>
+        <button class="mobile-toggle"><i class="fa-solid fa-bars"></i></button>
+
     </div>
 </header>
 <?php endif; /* end conditional header */ ?>

@@ -17,48 +17,98 @@ body {
     padding: 0 24px;
 }
 
-/* ============================================ */
-/* HEADER (UPGRADED PREMIUM LOOK) */
-/* ============================================ */
-/* Container – more breathing room */
+/* ===== HEADER ===== */
+.header {
+    background: #ffffff;
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+    border-bottom: 1px solid #f0f2f5;
+    position: relative;
+    z-index: 100;
+}
+
 .header-container {
     max-width: 1280px;
     margin: 0 auto;
-    padding: 0 50px;          /* ← increased side padding */
+    padding: 0 40px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 72px;
+    height: 75px;
 }
 
-/* Nav menu – keep gap, add margin if desired */
+/* ===== LOGO ===== */
+.logo a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+.logo-icon {
+    font-size: 22px;
+    color: #0E7A4E;
+}
+.logo-text {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: #000000;
+    position: relative;
+}
+.logo-text::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -4px;
+    width: 38px;
+    height: 2px;
+    background: #0E7A4E;
+    border-radius: 10px;
+}
+
+/* ===== NAV MENU ===== */
 .nav-menu ul {
     display: flex;
     list-style: none;
-    gap: 90px;
-    margin: 0 20px;           /* ← optional: add side margin */
+    gap: 40px;
     padding: 0;
 }
-
-/* Links – bigger click area */
 .nav-menu ul li a {
     text-decoration: none;
-    font-size: 19px;
+    font-size: 16px;
     font-weight: 600;
-    color: #1f2937;
+    color: #000000;
     position: relative;
-    padding: 9px 22px;        /* ← increased left/right padding */
+    padding: 6px 0;
     transition: color 0.25s ease;
-    letter-spacing: 0.3px;
 }
-/* ===== HEADER ACTIONS (profile area) ===== */
+.nav-menu ul li a::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -4px;
+    width: 0%;
+    height: 2.5px;
+    background: #0E7A4E;
+    transition: width 0.35s ease;
+    border-radius: 4px;
+}
+.nav-menu ul li a:hover::after,
+.nav-menu ul li a.active::after {
+    width: 100%;
+}
+.nav-menu ul li a:hover,
+.nav-menu ul li a.active {
+    color: #0E7A4E;
+}
+
+/* ===== PROFILE (corner) ===== */
 .header-actions {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 16px;
+    /* margin-left: auto;  <-- YEH LINE HATA DEIN */
 }
 
-/* Profile dropdown – clean */
 .profile-dropdown {
     position: relative;
 }
@@ -66,39 +116,13 @@ body {
 .profile-trigger-btn {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     background: transparent;
     border: none;
     cursor: pointer;
-    padding: 6px 12px;
+    padding: 4px 10px;
     border-radius: 30px;
     transition: background 0.2s;
-}
-
-.profile-info {
-    display: flex;
-    flex-direction: column;    /* name on top, role below */
-    align-items: flex-start;
-    line-height: 1.3;
-}
-
-.profile-name-text {
-    font-size: 15px;
-    font-weight: 600;
-    color: #1f2937;
-}
-
-.profile-role-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: #0E7A4E;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    background: #e8f5ee;
-    padding: 0 10px;
-    border-radius: 12px;
-    line-height: 1.7;
-    margin-top: 1px;
 }
 .profile-trigger-btn:hover {
     background: #f3f4f6;
@@ -107,6 +131,7 @@ body {
 .profile-avatar-btn {
     width: 38px;
     height: 38px;
+    min-width: 38px;
     border-radius: 50%;
     background: #0E7A4E;
     color: #fff;
@@ -114,7 +139,7 @@ body {
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 17px;
+    font-size: 15px;
     overflow: hidden;
     flex-shrink: 0;
 }
@@ -122,23 +147,39 @@ body {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    display: block;
 }
 
+.profile-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.2;
+}
 .profile-name-text {
-    font-size: 16px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #000000;
+    white-space: nowrap;
+}
+/* Role Buyer/Seller/Admin — BLUE color jesa aap ne bola */
+.profile-role-label {
+    font-size: 11px;
     font-weight: 600;
-    color: #1f2937;
+    color: #2563EB;
+    text-transform: capitalize;
+    margin-top: 2px;
 }
 
-/* Dropdown menu – elevated */
+/* Dropdown box */
 .profile-dropdown-menu {
     position: absolute;
     right: 0;
-    top: calc(100% + 8px);
-    min-width: 200px;
+    top: calc(100% + 10px);
+    min-width: 180px;
     background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.10);
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.12);
     border: 1px solid #edf2f7;
     padding: 8px 0;
     opacity: 0;
@@ -152,158 +193,49 @@ body {
     visibility: visible;
     transform: translateY(0);
 }
-
 .profile-dropdown-header {
-    padding: 12px 20px 10px;
+    padding: 10px 18px;
     border-bottom: 1px solid #f1f5f9;
     margin-bottom: 6px;
 }
-.profile-dropdown-header strong {
-    font-size: 15px;
-    color: #0b1a2e;
-}
-
 .profile-dropdown-menu a {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 20px;
-    color: #334155;
+    gap: 10px;
+    padding: 10px 18px;
+    color: #000000;
     text-decoration: none;
     font-size: 14px;
     font-weight: 500;
-    transition: background 0.15s;
 }
 .profile-dropdown-menu a:hover {
     background: #f8fafc;
     color: #0E7A4E;
 }
 .profile-dropdown-menu a i {
-    width: 18px;
+    width: 16px;
     text-align: center;
     color: #64748b;
 }
 
-/* Buttons for guests */
-.btn-outline {
-    padding: 10px 22px;
-    border: 1.5px solid #d1d5db;
-    border-radius: 40px;
-    font-weight: 600;
-    font-size: 15px;
-    color: #1f2937;
-    text-decoration: none;
-    transition: all 0.25s;
-}
-.btn-outline:hover {
-    border-color: #0E7A4E;
-    color: #0E7A4E;
-    background: rgba(14,122,78,0.04);
-}
-
-.btn-solid {
-    padding: 10px 26px;
-    background: #0E7A4E;
-    border: none;
-    border-radius: 40px;
-    font-weight: 600;
-    font-size: 15px;
-    color: #fff;
-    text-decoration: none;
-    transition: all 0.25s;
-}
-.btn-solid:hover {
-    background: #0a5c3a;
-    transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(14,122,78,0.25);
-}
-
-/* Mobile toggle (keep as is) */
+/* Mobile */
 .mobile-toggle {
     display: none;
     background: none;
     border: none;
-    font-size: 24px;
-    color: #1f2937;
+    font-size: 22px;
+    color: #000000;
     cursor: pointer;
 }
 
-/* Responsive – keep your existing mobile styles */
-@media (max-width: 992px) {
-    .nav-menu ul {
-        gap: 28px;
-    }
-    .nav-menu ul li a {
-        font-size: 17px;
-    }
-}
 @media (max-width: 768px) {
     .mobile-toggle { display: block; }
-    .nav-menu { display: none; }
-    .header-container { height: 64px; }
-    /* … add your existing mobile menu styles … */
+    .nav-menu, .header-actions { display: none; }
+    .header-container { height: 64px; padding: 0 20px; }
 }
-/* ============================================ */
-/* HEADER ACTIONS */
-/* ============================================ */
-
-.header-actions {
-    display: flex;
-    align-items: center;
-    gap: 18px;
-}
-
-.wishlist {
-    text-decoration: none;
-    color: #222;
-    font-size: 16px;
-    font-weight: 600;
-}
-
-/* buttons */
-.btn-outline {
-    text-decoration: none;
-    padding: 10px 24px;
-    border: 1.5px solid #0E7A4E;
-    border-radius: 10px;
-    color: #0E7A4E;
-    font-weight: 600;
-    transition: 0.3s;
-}
-
-.btn-outline:hover {
-    background: #0E7A4E;
-    color: #fff;
-}
-
-.btn-solid {
-    text-decoration: none;
-    padding: 10px 28px;
-    background: #0E7A4E;
-    border-radius: 10px;
-    color: #FFF;
-    font-weight: 600;
-    transition: 0.3s;
-}
-
-.btn-solid:hover {
-    background: #0a5c3a;
-}
-
-/* mobile */
-.mobile-toggle {
-    display: none;
-    background: none;
-    border: none;
-    font-size: 24px;
-    cursor: pointer;
-}
-
 /* ============================================ */
 /* HERO SECTION - EXACT MATCH TO hero.png      */
 /* ============================================ */
-
-
 
 .hero-overlay {
     position: absolute;
@@ -1601,20 +1533,38 @@ body {
     padding-bottom:25px;
 }
 
-/* LOGO */
+/* LOGO – matches sidebar style (green icon + white text + underline) */
 .logo{
     display:flex;
     align-items:center;
     gap:10px;
-    color:#fff;
+    color:#f8f8f8;
     font-size:20px;
-    font-weight:700;
+    font-weight:800;
     margin-bottom:15px;
 }
 
 .logo i{
     color:#0E7A4E;
     font-size:30px;
+}
+.logo .logo-text{
+    font-size:29px;
+    font-weight:800;
+    letter-spacing:-0.5px;
+    color:#000000;
+    position:relative;
+}
+
+.logo .logo-text::after{
+    content:'';
+    position:absolute;
+    left:0;
+    bottom:-4px;
+    width:45px;
+    height:3px;
+    background:#0E7A4E;
+    border-radius:10px;
 }
 
 /* TEXT */
@@ -2323,86 +2273,168 @@ body {
         font-size: 12px;
     }
 }
-.profile-dropdown {
-    position: relative;
-}
-.profile-trigger-btn {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    padding: 4px 8px 4px 4px;
-    border-radius: 30px;
-    transition: background 0.2s;
-}
-.profile-trigger-btn:hover {
-    background: #F3F4F6;
-}
-.profile-name-text {
-    font-size: 14px;
-    font-weight: 600;
-    color: #111827;
-}
-.profile-avatar-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    border: 2px solid #E5E7EB;
-    background: #2563EB;
-    color: white;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+
+/* ============================================ */
+/* ===== CHATBOT STYLES – green hover effects ===== */
+/* ============================================ */
+
+/* Chat container (if you have a fixed chat widget) */
+.chat-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 360px;
+    max-width: 90vw;
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+    border: 1px solid #edf2f7;
     overflow: hidden;
-    padding: 0;
-}
-.profile-avatar-btn img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-.profile-dropdown-menu {
-    display: none;
-    position: absolute;
-    top: 48px;
-    right: 0;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-    min-width: 200px;
-    overflow: hidden;
-    z-index: 100;
-}
-.profile-dropdown-menu.open {
-    display: block;
-}
-.profile-dropdown-header {
-    padding: 14px 16px;
-    border-bottom: 1px solid #E5E7EB;
+    z-index: 999;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    max-height: 520px;
+    transition: all 0.3s ease;
 }
-.profile-role-badge {
-    font-size: 11px;
-    color: #2563EB;
-    background: #EFF6FF;
-    padding: 2px 8px;
-    border-radius: 10px;
-    width: fit-content;
-}
-.profile-dropdown-menu a {
+
+/* Chat header */
+.chat-header {
+    background: #0E7A4E;
+    color: #fff;
+    padding: 14px 20px;
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.chat-header .close-btn {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+/* Chat messages area */
+.chat-messages {
+    flex: 1;
+    padding: 16px 18px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: #f9fafb;
+}
+
+/* Individual message bubbles */
+.chat-message {
+    padding: 10px 16px;
+    border-radius: 18px;
+    max-width: 82%;
+    word-wrap: break-word;
+    font-size: 14px;
+    line-height: 1.5;
+    transition: background 0.25s ease, transform 0.2s ease;
+}
+
+/* Bot message (left) */
+.chat-message.bot {
+    background: #e9edf4;
+    color: #0b1a2e;
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+}
+.chat-message.bot:hover {
+    background: #d6e6dd;
+    transform: translateX(4px);
+}
+
+/* User message (right) – green */
+.chat-message.user {
+    background: #0E7A4E;
+    color: #ffffff;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+}
+.chat-message.user:hover {
+    background: #0a5c3a;
+    transform: translateX(-4px);
+}
+
+/* Chat input area */
+.chat-input-area {
+    display: flex;
     gap: 10px;
     padding: 12px 16px;
-    color: #111827;
-    text-decoration: none;
-    font-size: 14px;
+    border-top: 1px solid #edf2f7;
+    background: #ffffff;
 }
-.profile-dropdown-menu a:hover {
-    background: #F8FAFC;
+
+.chat-input {
+    flex: 1;
+    border: 2px solid #e2e8f0;
+    border-radius: 30px;
+    padding: 10px 18px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+.chat-input:focus {
+    border-color: #0E7A4E;
+    box-shadow: 0 0 0 4px rgba(14, 122, 78, 0.15);
+}
+
+.chat-send-btn {
+    background: #0E7A4E;
+    color: #fff;
+    border: none;
+    padding: 0 22px;
+    border-radius: 30px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+.chat-send-btn:hover {
+    background: #0a5c3a;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(14, 122, 78, 0.35);
+}
+
+/* Floating toggle button (to open chat) */
+.chat-toggle-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #0E7A4E;
+    color: #fff;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    box-shadow: 0 8px 30px rgba(14, 122, 78, 0.35);
+    transition: all 0.3s ease;
+    z-index: 998;
+}
+.chat-toggle-btn:hover {
+    background: #0a5c3a;
+    transform: scale(1.08);
+    box-shadow: 0 12px 40px rgba(14, 122, 78, 0.45);
+}
+
+/* Responsive chat */
+@media (max-width: 480px) {
+    .chat-container {
+        width: 100vw;
+        max-width: 100vw;
+        bottom: 0;
+        right: 0;
+        border-radius: 20px 20px 0 0;
+        max-height: 80vh;
+    }
 }
