@@ -80,36 +80,38 @@ $is_contact = ($current_page == 'contact.php' || $current_page == 'contact-us.ph
             </ul>
         </nav>
 
-        <!-- PROFILE (right corner) -->
+        <!-- HEADER ACTIONS -->
         <div class="header-actions">
             <?php if (isset($_SESSION['user_id'])): ?>
-            <div class="profile-dropdown">
-                <button class="profile-trigger-btn" onclick="document.getElementById('headerProfileMenu').classList.toggle('open')">
-                    <div class="profile-avatar-btn">
-                        <?php if ($has_header_pic): ?>
-                            <img src="<?php echo htmlspecialchars($header_pic_path); ?>" alt="">
-                        <?php else: ?>
-                            <i class="fa-solid fa-user"></i>
-                        <?php endif; ?>
+                <!-- Logged in – show profile dropdown -->
+                <div class="profile-dropdown">
+                    <button class="profile-trigger-btn" onclick="document.getElementById('headerProfileMenu').classList.toggle('open')">
+                        <div class="profile-avatar-btn">
+                            <?php if ($has_header_pic): ?>
+                                <img src="<?php echo htmlspecialchars($header_pic_path); ?>" alt="">
+                            <?php else: ?>
+                                <i class="fa-solid fa-user"></i>
+                            <?php endif; ?>
+                        </div>
+                        <div class="profile-info">
+                            <span class="profile-name-text"><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></span>
+                            <?php if ($is_home_page && !empty($user_role_display)): ?>
+                                <span class="profile-role-label"><?php echo htmlspecialchars($user_role_display); ?></span>
+                            <?php endif; ?>
+                        </div>
+                    </button>
+                    <div class="profile-dropdown-menu" id="headerProfileMenu">
+                        <div class="profile-dropdown-header">
+                            <strong><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></strong>
+                        </div>
+                        <a href="<?php echo $dashboard_link; ?>"><i class="fa-solid fa-gauge"></i> Dashboard</a>
+                        <a href="logout.php"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
                     </div>
-                    <div class="profile-info">
-                        <span class="profile-name-text"><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></span>
-                        <?php if ($is_home_page && !empty($user_role_display)): ?>
-                            <span class="profile-role-label"><?php echo htmlspecialchars($user_role_display); ?></span>
-                        <?php endif; ?>
-                    </div>
-                </button>
-                <div class="profile-dropdown-menu" id="headerProfileMenu">
-                    <div class="profile-dropdown-header">
-                        <strong><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></strong>
-                    </div>
-                    <a href="<?php echo $dashboard_link; ?>"><i class="fa-solid fa-gauge"></i> Dashboard</a>
-                    <a href="logout.php"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
                 </div>
-            </div>
             <?php else: ?>
+                <!-- Logged out – Login & Sign Up buttons (rectangular) -->
                 <a href="login.php" class="btn-outline">Login</a>
-                <a href="register.php" class="btn-solid">Register</a>
+                <a href="signup.php" class="btn-solid">Sign Up</a>
             <?php endif; ?>
         </div>
 

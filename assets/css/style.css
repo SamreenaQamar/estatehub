@@ -101,14 +101,54 @@ body {
     color: #0E7A4E;
 }
 
-/* ===== PROFILE (corner) ===== */
+/* ===== HEADER ACTIONS & BUTTONS ===== */
 .header-actions {
     display: flex;
     align-items: center;
     gap: 16px;
-    /* margin-left: auto;  <-- YEH LINE HATA DEIN */
 }
 
+/* Guest buttons (Login / Register) – rectangular, not pill */
+.btn-outline {
+    padding: 9px 24px;
+    border: 2px solid #0E7A4E;
+    border-radius: 8px;          /* changed from 30px to 8px */
+    background: transparent;
+    color: #0E7A4E;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+    white-space: nowrap;
+}
+.btn-outline:hover {
+    background: #0E7A4E;
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(14, 122, 78, 0.3);
+}
+
+.btn-solid {
+    padding: 9px 26px;
+    border: none;
+    border-radius: 8px;          /* changed from 30px to 8px */
+    background: #0E7A4E;
+    color: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+    white-space: nowrap;
+}
+.btn-solid:hover {
+    background: #0a5c3a;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(14, 122, 78, 0.35);
+}
+
+/* ===== PROFILE DROPDOWN (logged in) ===== */
 .profile-dropdown {
     position: relative;
 }
@@ -162,7 +202,6 @@ body {
     color: #000000;
     white-space: nowrap;
 }
-/* Role Buyer/Seller/Admin — BLUE color jesa aap ne bola */
 .profile-role-label {
     font-size: 11px;
     font-weight: 600;
@@ -176,7 +215,7 @@ body {
     position: absolute;
     right: 0;
     top: calc(100% + 10px);
-    min-width: 180px;
+    min-width: 200px;
     background: #ffffff;
     border-radius: 14px;
     box-shadow: 0 12px 40px rgba(0,0,0,0.12);
@@ -218,7 +257,7 @@ body {
     color: #64748b;
 }
 
-/* Mobile */
+/* Mobile toggle */
 .mobile-toggle {
     display: none;
     background: none;
@@ -233,6 +272,7 @@ body {
     .nav-menu, .header-actions { display: none; }
     .header-container { height: 64px; padding: 0 20px; }
 }
+
 /* ============================================ */
 /* HERO SECTION - EXACT MATCH TO hero.png      */
 /* ============================================ */
@@ -2278,7 +2318,7 @@ body {
 /* ===== CHATBOT STYLES – green hover effects ===== */
 /* ============================================ */
 
-/* Chat container (if you have a fixed chat widget) */
+/* Chat container */
 .chat-container {
     position: fixed;
     bottom: 24px;
